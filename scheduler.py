@@ -1,15 +1,5 @@
 import subprocess
-
-def humanize(num):
-    """A utility function to help generate human readable number string"""
-    if not isinstance(num, int) and num.isdigit():
-        num = int(num)
-    for unit in ['', 'K', 'M']:
-        if num % 1000:
-            return '%d%s' % (num, unit)
-        else:
-            num /= 1000
-    return "%d%s" % (num, 'G')
+import logging
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
@@ -34,23 +24,6 @@ class Scheduler(object):
             self.cmd += ' ' + argname
 
     def run(self):
-        """Run cmd as subprocess and add it in job_pool."""
-        print self.cmd
-        job_id = subprocess.check_output(self.cmd, shell=True)
-        job_id = job_id.strip()
-        if job_id != Scheduler.NO_JOB:
-            Scheduler.job_pool.append(job_id)
-
-    def run_after(self):
-        """Run cmd as subprocess after processes in job_pool have finished.
-
-        This subprocess will not be blocked, and allows multiple subprocesses
-        run in parallel.
-
-        Returns:
-            A process desc itself.
-        """
-        if Scheduler.job_pool:
-            jobs = ' '.join(Scheduler.job_pool)
-            self.add_argument('--after', jobs)
+        """Run cmd as subprocess and return the Popen object."""
+        logging.debug(self.cmd)
         return subprocess.Popen(self.cmd, shell=True)

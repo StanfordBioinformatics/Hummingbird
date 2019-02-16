@@ -1,71 +1,46 @@
-import argparse
-import configparser
-import numpy as np
-from scipy.interpolate import Rbf, UnivariateSpline
-from sklearn import linear_model
-import matplotlib.pyplot as plt
-from downsample import Downsample
-from profiling import Profiler
+from __future__ import print_function
+import subprocess
+import sqlite3
 
-def extrapolate(method, known_data, target_value):
-    """Use scipy interpolate module to extrapolate target value and plot."""
-    x = known_data.keys()
-    ys = np.array(known_data.values())
-    result = []
-    x_test = np.linspace(1000, 100000000, num=100)
-    plt.figure(figsize=(18, 10))
-    for i in range(len(ys[0])):
-        y = ys[:,i]
-        if method == 'spline':
-            f = UnivariateSpline(x, y, k=1, ext='extrapolate')
-        elif method == 'rbf':
-            f = Rbf(x, y)
-        result.append(f(target_value))
+class Instance:
+    @staticmethod
+    def get_machine_types(conf, min_mem):
+        service = conf['Platform']['service']
+        service = service.lower()
+        region = conf['Platform']['regions']
+        cpu_list = conf['Profiling']['thread'].split(',')
+        if service == 'google' or service == 'gcp':
+            return GCP_Instance.get_machine_types(region, cpu_list, min_mem)
 
-        plt.subplot(len(ys[0]), 1, i + 1)
-        plt.plot(x_test, f(x_test), 'b', x, y, 'ro')
-    plt.show()
-    return result
+    def __init__(self, cpu, mem):
+        self.cpu = cpu
+        self.mem = mem
 
-def regression(known_data, target_value):
-    """Use sklearn regression module to predict target value and plot."""
-    X = np.array(known_data.keys())
-    X = X.reshape((len(known_data), 1))
-    ys = np.array(known_data.values())
-    result = []
-    x_test = np.linspace(1000, 100000000, num=100)
-    x_test = x_test.reshape(100, 1)
-    plt.figure(figsize=(18, 10))
-    for i in range(len(ys[0])):
-        y = ys[:,i]
-        regr = linear_model.LinearRegression()
-        regr.fit(X, y)
-        result.append(regr.predict(target_value))
+class GCP_Instance(Instance):
+    @staticmethod
+    def get_machine_types(region, cpu_list, min_mem):
+        output = subprocess.check_output('gcloud compute machine-types list', shell=True)
+        conn = sqlite3.connect(':memory:')
+        cur = conn.cursor()
+        cur.execute('''CREATE TABLE instance
+                    (NAME text, ZONE text, CPUS INTEGER, MEMORY_GB real, DEPRECATED text)''')
+        machine_types = output.splitlines()
+        machine_types = [line.split() for line in machine_types]
+        # Deprecated filed is empty for returned output
+        machine_types = [line + [None] for line in machine_types if len(line) == 4]
+        cur.executemany("INSERT INTO instance VALUES (?,?,?,?,?)", machine_types)
+        SQL = '''SELECT DISTINCT NAME, MEMORY_GB FROM instance
+WHERE ZONE LIKE ?
+AND MEMORY_GB >= ?
+AND CPUS = ? '''
+        for cpu, mem in zip(cpu_list, min_mem):
+            cur.execute(SQL, [region + '%', mem, cpu])
+        valid = cur.fetchall()
+        SQL.replace('>=', '<')
+        for cpu, mem in zip(cpu_list, min_mem):
+            cur.execute(SQL, [region + '%', mem, cpu])
+        invalid = cur.fetchall()
+        return valid, invalid
 
-        plt.subplot(len(ys[0]), 1, i + 1)
-        plt.plot(x_test, regr.predict(x_test), 'b', X, y, 'ro')
-    plt.show()
-    return result
-
-def main():
-    """The main pipeline."""
-    parser = argparse.ArgumentParser(description='Process command line input')
-    parser.add_argument('-c', '--conf', dest='config_file',
-                        default='User_Provided_Input.conf')
-    args = parser.parse_args()
-
-    config = configparser.ConfigParser()
-    config.read(args.config_file)
-
-    downsampler = Downsample('zless', config)
-    ds_dict = downsampler.subsample()
-
-    profiler = Profiler('time', config)
-    pf_dict = profiler.profile(ds_dict)
-
-    print pf_dict
-    print extrapolate('spline', pf_dict, 700000000)
-    print regression(pf_dict, 700000000)
-
-if __name__ == "__main__":
-    main()
+    def __init__(self, cpu, mem):
+        Instance.__init__(self, cpu, mem)

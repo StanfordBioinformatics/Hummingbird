@@ -1,10 +1,10 @@
 import os
 import csv
+import sys
 from collections import defaultdict
-from scheduler import Scheduler, humanize
+from scheduler import Scheduler
+from hummingbird_utils import *
 
-FA_EXT = ['.fa', '.fasta', '.fq', '.fastq']
-ZIP_EXT = ['.gz']
 # COMMAND = '''
 # dsub \
 # --provider google-v2 \
@@ -31,7 +31,7 @@ class Downsample(object):
 
     def subsample(self):
         """Generate subsamples for input data according to the input format."""
-        filenames = self.conf['Downsample']['input'].split(',')
+        filenames = self.conf['Downsample']['input'].splitlines()
         file_dict = defaultdict(list)
         for filename in filenames:
             filename = filename.strip()
@@ -56,9 +56,15 @@ class Downsample(object):
             A dict mapping a string of downsampled size to a list of downsampled
                 filenames.
         """
-        entry_counts = self.conf['Downsample']['size'].split(',')
-        bucket_path = 'gs://' + self.conf['Downsample']['bucket']
+        entry_counts = self.conf['Downsample']['size']
+        if entry_counts == 'auto':
+            entry_counts = ['0.001', '0.01', '0.1']
+            self.tool = 'seqtk'
+        else:
+            entry_counts = entry_counts.split(',')
+        bucket_path = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
+        log_path = bucket_path + '/' + self.conf['Downsample']['logging']
         downsampled = defaultdict(list)
 
         with open('downsample.tsv', 'w') as dsub_tsv:
@@ -72,10 +78,17 @@ class Downsample(object):
                 for entry_count in entry_counts:
                     entry_count = entry_count.strip()
                     if self.tool == 'seqtk':
-                        target_file = os.path.basename(base) + '_' + humanize(entry_count) + extension
+                        target_file = os.path.basename(base) + '_seqtk_' + humanize(entry_count) + extension
                     elif self.tool == 'zless':
                         target_file = os.path.basename(base) + '_zless_' + humanize(entry_count) + extension
                     target_path = '/'.join([bucket_path, output_path, target_file])
+                    if not entry_count.isdigit():
+                        try:
+                            target_size = int(self.conf['Downsample']['target'])
+                            entry_count = float(entry_count) * target_size
+                            entry_count = str(int(entry_count))
+                        except ValueError:
+                            sys.exit("The downsample input size is invalid.")
                     downsampled[entry_count].append(target_path)
                     if self.tool == 'seqtk':
                         tsv_writer.writerow([entry_count, filename, target_path])
@@ -89,9 +102,11 @@ class Downsample(object):
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
             scheduler.add_argument('--command', "'zless ${INPUT_FILE} | head -n ${COUNT} > ${OUTPUT_FILE}'")
         scheduler.add_argument('--tasks', 'downsample.tsv')
-        scheduler.add_argument('--logging', self.conf['Downsample']['logging'])
+        scheduler.add_argument('--logging', log_path)
         scheduler.add_argument('--machine-type', MACHINE_TYPE)
         scheduler.add_argument('--disk-size', DISK_SIZE)
+        scheduler.add_argument('--wait')
         scheduler.add_argument('--skip')
-        scheduler.run()
+        p = scheduler.run()
+        p.wait()
         return downsampled
