@@ -2,6 +2,7 @@ import os
 import csv
 from collections import defaultdict
 from google.cloud import storage
+from instance import *
 from scheduler import Scheduler
 from hummingbird_utils import *
 
@@ -24,12 +25,13 @@ class Profiler(object):
         conf: A dictionary of configrations.
         client: Cloud storage client instance.
     """
-    def __init__(self, tool, conf):
+    def __init__(self, tool, mode, conf):
         self.tool = tool
+        self.mode = mode
         self.conf = conf
         self.client = storage.Client(project=conf['Platform']['project'])
 
-    def profile(self, input_dict):
+    def profile(self, input_dict, machines=None):
         """Perform profiling on given input and collect result from cloud
             storage bucket.
 
@@ -39,24 +41,26 @@ class Profiler(object):
 
         Returns:
             A dict mapping a string of downsampled size to a list of
-                memory usage sizes in the same order of threads specified in
+                memory/time usage sizes in the same order of threads specified in
                 config file.
         """
         if self.tool == 'time':
-            result_dict = self.time_profile(input_dict)
+            if self.mode == 'mem':
+                result_dict = self.gnutime_profile('"%M"', input_dict, machines)
+            elif self.mode == 'time':
+                result_dict = self.gnutime_profile('"%e"', input_dict, machines)
 
         bucket = self.client.get_bucket(self.conf['Platform']['bucket'])
         profiling_dict = defaultdict(list)
         for entry_count in result_dict:
             files_list = result_dict[entry_count]
-            entry_count_int = int(entry_count)
             for result_file in files_list:
                 blob = bucket.blob(result_file)
-                max_res_set = int(blob.download_as_string())
-                profiling_dict[entry_count_int].append(max_res_set)
+                res_set = float(blob.download_as_string())
+                profiling_dict[entry_count].append(res_set)
         return profiling_dict
 
-    def time_profile(self, input_dict):
+    def gnutime_profile(self, format, input_dict, machines=None):
         """Perform profiling on given input.
 
         Args:
@@ -65,9 +69,14 @@ class Profiler(object):
 
         Returns:
             A dict mapping a string of downsampled size to a list of
-                paths of the results of memory usage profiling.
+                paths of the results of memory/time usage profiling.
         """
-        thread_list = self.conf.get('Profiling', 'thread', fallback="4").split(',')
+        if not machines:
+            machines = list()
+            thread_list = self.conf.get('Profiling', 'thread', fallback="4").split(',')
+            for thread in thread_list:
+                thread = thread.strip()
+                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + thread, thread, None))
         dir_input = self.conf.get('Profiling', 'reference', fallback=None)
         extra_input = self.conf.get('Profiling', 'extra_input', fallback="").splitlines()
         extra_output = self.conf.get('Profiling', 'output', fallback="").splitlines()
@@ -85,23 +94,23 @@ class Profiler(object):
                 copy.write('apt-get -qq update\n')
                 copy.write('apt-get -qq install time\n')
                 for line in ori:
-                    copy.write('/usr/bin/time -f "%M" -o ${RESULT_FILE} -a ' + line + '\n')
+                    copy.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
         else:
             with open(script_name, 'w') as script:
                 script.write('apt-get -qq update\n')
                 script.write('apt-get -qq install time\n')
                 for line in self.conf['Profiling']['command'].splitlines():
-                    script.write('/usr/bin/time -f "%M" -o ${RESULT_FILE} -a ' + line + '\n')
+                    script.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
 
         # Prepare dsub tsv file and run
         # dsub only one type of machine at a time
-        # each thread will have an individual tsv
+        # each machine type will have an individual tsv
         procs = []
-        for thread in thread_list:
-            thread = thread.strip()
+        for machine in machines:
+            #thread = thread.strip()
             scheduler = Scheduler('dsub', self.conf)
             scheduler.add_argument('--script', script_name)
-            tsv_filename = 'profiling_' + thread + '.tsv'
+            tsv_filename = 'profiling_' + machine.name + '.tsv'
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--env THREAD', '--output RESULT_FILE']
@@ -119,10 +128,11 @@ class Profiler(object):
                 tsv_writer.writerow(headline)
 
                 for entry_count in input_dict:
-                    result_path = self.conf['Profiling']['result'] + '/' + humanize(entry_count) + '_' + thread + '.out'
+                    print(entry_count, humanize(entry_count))
+                    result_path = self.conf['Profiling']['result'] + '/' + self.mode + '/' + machine.name + '_' + humanize(entry_count) + '.out'
                     result_dict[entry_count].append(result_path)
                     result_addr = output_base + result_path
-                    row = [thread, result_addr] + input_dict[entry_count]
+                    row = [machine.get_core(), result_addr] + input_dict[entry_count]
                     if dir_input:
                         row.append(dir_input)
                     for extra in extra_input:
@@ -140,14 +150,14 @@ class Profiler(object):
                                     full_ext = ext + full_ext
                                 else:
                                     break
-                            output = output + '_' + thread + "_" + humanize(entry_count) + full_ext
+                            output = output + '_' + machine.get_core() + "_" + humanize(entry_count) + full_ext
                             row.append(output)
                     tsv_writer.writerow(row)
 
             scheduler.add_argument('--image', self.conf['Profiling']['image'])
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
-            scheduler.add_argument('--machine-type', MACHINE_TYPE_PREFIX + thread)
+            scheduler.add_argument('--machine-type', machine.name)
             scheduler.add_argument('--wait')
             scheduler.add_argument('--skip')
             proc = scheduler.run()

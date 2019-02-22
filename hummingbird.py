@@ -49,7 +49,7 @@ def regression(known_data, target_value):
 
         plt.subplot(len(ys[0]), 1, i + 1)
         plt.plot(x_test, regr.predict(x_test), 'b', X, y, 'ro')
-    plt.show()
+    #plt.show()
     return result
 
 def main():
@@ -66,7 +66,7 @@ def main():
     config = configparser.ConfigParser()
     config.read(args.config_file)
 
-    logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.DEBUG)
     logging.info('Preparing downsampling...')
     downsampler = Downsample(args.downsample_tool, config)
     ds_dict = downsampler.subsample()
@@ -74,7 +74,7 @@ def main():
     logging.debug(ds_dict)
 
     logging.info('Preparing memory profiling...')
-    profiler = Profiler(args.profile_tool, config)
+    profiler = Profiler(args.profile_tool, 'mem', config)
     pf_dict = profiler.profile(ds_dict)
     logging.info('Memory profiling done.')
     logging.debug(pf_dict)
@@ -87,18 +87,29 @@ def main():
     for i, t in enumerate(thread_list):
         print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Bytes.'.format(target, t, predictions[i]))
 
-    reserved_mem = 1
+    reserved_mem = 8
     min_mem = [pred/1000/1000/1000 + reserved_mem for pred in predictions]
     valid, invalid = Instance.get_machine_types(config, min_mem)
     if valid:
-        print('We sugguest to test on the following machine types:')
-        for row in valid:
-            print(bcolors.OKGREEN + row[0] + bcolors.ENDC, str(row[1]) + 'GB')
+        print('Sugguest to test on the following machine types:')
+        for ins in valid:
+            print(bcolors.OKGREEN + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
     else:
         print('No pre-defined machine types found.')
+    if invalid:
+        print('Machine types might not have enouph memory and will be pruned:')
+        for ins in invalid:
+            print(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
     print('Try customized machine type if necessary:')
     for i, t in enumerate(thread_list):
         print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
+
+    logging.info('Preparing runtime profiling...')
+    profiler = Profiler(args.profile_tool, 'time', config)
+    ds_size = int(target * 0.01)
+    rt_dict = profiler.profile({ds_size:ds_dict[ds_size]}, valid)
+    logging.info('Runtime profiling done.')
+    logging.debug(rt_dict)
 
 if __name__ == "__main__":
     main()

@@ -13,10 +13,10 @@ class bcolors:
 
 def humanize(num):
     """A utility function to help generate human readable number string"""
-    if not isinstance(num, int) and num.isdigit():
+    try:
         num = int(num)
-    else:
-        return num
+    except:
+        sys.exit("Unalbe to humanize input value.")
     for unit in ['', 'K', 'M']:
         if num % 1000:
             return '%d%s' % (num, unit)

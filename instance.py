@@ -12,13 +12,21 @@ class Instance:
         if service == 'google' or service == 'gcp':
             return GCP_Instance.get_machine_types(region, cpu_list, min_mem)
 
-    def __init__(self, cpu, mem):
-        self.cpu = cpu
-        self.mem = mem
+    def __init__(self, name, cpu, mem):
+        self.name = name
+        self.cpu = int(cpu)
+        if mem:
+            self.mem = float(mem)
+        else:
+            self.mem = None
+
+    def get_core(self):
+        return str(self.cpu)
 
 class GCP_Instance(Instance):
     @staticmethod
     def get_machine_types(region, cpu_list, min_mem):
+        valid, invalid = [], []
         output = subprocess.check_output('gcloud compute machine-types list', shell=True)
         conn = sqlite3.connect(':memory:')
         cur = conn.cursor()
@@ -29,18 +37,24 @@ class GCP_Instance(Instance):
         # Deprecated filed is empty for returned output
         machine_types = [line + [None] for line in machine_types if len(line) == 4]
         cur.executemany("INSERT INTO instance VALUES (?,?,?,?,?)", machine_types)
-        SQL = '''SELECT DISTINCT NAME, MEMORY_GB FROM instance
+        conn.commit()
+        SQL = '''SELECT DISTINCT NAME, CPUS, MEMORY_GB FROM instance
 WHERE ZONE LIKE ?
 AND MEMORY_GB >= ?
 AND CPUS = ? '''
         for cpu, mem in zip(cpu_list, min_mem):
             cur.execute(SQL, [region + '%', mem, cpu])
-        valid = cur.fetchall()
-        SQL.replace('>=', '<')
+            entries = cur.fetchall()
+            for entry in entries:
+                valid.append(GCP_Instance(entry[0], entry[1], entry[2]))
+        SQL = SQL.replace('>=', '<')
         for cpu, mem in zip(cpu_list, min_mem):
             cur.execute(SQL, [region + '%', mem, cpu])
-        invalid = cur.fetchall()
+            entries = cur.fetchall()
+            for entry in entries:
+                invalid.append(GCP_Instance(entry[0], entry[1], entry[2]))
+        conn.close()
         return valid, invalid
 
-    def __init__(self, cpu, mem):
-        Instance.__init__(self, cpu, mem)
+    def __init__(self, name, cpu, mem):
+        Instance.__init__(self, name, cpu, mem)

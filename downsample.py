@@ -62,6 +62,10 @@ class Downsample(object):
             self.tool = 'seqtk'
         else:
             entry_counts = entry_counts.split(',')
+        entry_counts = [entry.strip() for entry in entry_counts]
+        # 1% downsample for runtime profiling
+        if '0.01' not in entry_counts:
+            entry_counts.append('0.01')
         bucket_path = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
         log_path = bucket_path + '/' + self.conf['Downsample']['logging']
@@ -76,24 +80,25 @@ class Downsample(object):
                 while extension in ZIP_EXT:
                     base, extension = os.path.splitext(base)
                 for entry_count in entry_counts:
-                    entry_count = entry_count.strip()
+                    if not entry_count.isdigit():
+                        try:
+                            target_size = int(self.conf['Downsample']['target'])
+                            entry_count = int(float(entry_count) * target_size)
+                            # numerical value exists according to equivalent fraction value
+                            if str(entry_count) in entry_counts:
+                                continue
+                        except ValueError:
+                            sys.exit("The downsample input size is invalid.")
                     if self.tool == 'seqtk':
                         target_file = os.path.basename(base) + '_seqtk_' + humanize(entry_count) + extension
                     elif self.tool == 'zless':
                         target_file = os.path.basename(base) + '_zless_' + humanize(entry_count) + extension
                     target_path = '/'.join([bucket_path, output_path, target_file])
-                    if not entry_count.isdigit():
-                        try:
-                            target_size = int(self.conf['Downsample']['target'])
-                            entry_count = float(entry_count) * target_size
-                            entry_count = str(int(entry_count))
-                        except ValueError:
-                            sys.exit("The downsample input size is invalid.")
                     downsampled[entry_count].append(target_path)
                     if self.tool == 'seqtk':
                         tsv_writer.writerow([entry_count, filename, target_path])
                     elif self.tool == 'zless':
-                        tsv_writer.writerow([int(entry_count)*4, filename, target_path])
+                        tsv_writer.writerow([entry_count*4, filename, target_path])
         scheduler = Scheduler('dsub', self.conf)
         if self.tool == 'seqtk':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
