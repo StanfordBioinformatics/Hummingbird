@@ -2,6 +2,28 @@ from __future__ import print_function
 import subprocess
 import sqlite3
 
+pricing = {
+'n1-standard-1': 0.0475,
+'n1-standard-2': 0.0950,
+'n1-standard-4': 0.1900,
+'n1-standard-8': 0.3800,
+'n1-standard-16': 0.7600,
+'n1-standard-32': 1.5200,
+'n1-standard-64': 3.0400,
+'n1-highmem-2': 0.1184,
+'n1-highmem-4': 0.2368,
+'n1-highmem-8': 0.4736,
+'n1-highmem-16': 0.9472,
+'n1-highmem-32': 1.8944,
+'n1-highmem-64': 3.7888,
+'n1-highcpu-2': 0.0709,
+'n1-highcpu-4': 0.1418,
+'n1-highcpu-8': 0.2836,
+'n1-highcpu-16': 0.5672,
+'n1-highcpu-32': 1.1344,
+'n1-highcpu-64': 2.2688
+}
+
 class Instance:
     @staticmethod
     def get_machine_types(conf, min_mem):
@@ -55,6 +77,14 @@ AND CPUS = ? '''
                 invalid.append(GCP_Instance(entry[0], entry[1], entry[2]))
         conn.close()
         return valid, invalid
+
+    def set_price(self, price=None):
+        if price:
+            self.price = price
+        elif self.name in pricing:
+            self.price = pricing[self.name]
+        else:
+            raise Exception('Fail to set price.')
 
     def __init__(self, name, cpu, mem):
         Instance.__init__(self, name, cpu, mem)

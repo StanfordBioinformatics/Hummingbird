@@ -1,7 +1,9 @@
 from __future__ import division, print_function
+from builtins import input
 import argparse
 import configparser
 import logging
+import math
 import numpy as np
 from sklearn import linear_model
 from scipy.interpolate import Rbf, UnivariateSpline
@@ -9,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from downsample import Downsample
 from profiling import Profiler
-from instance import Instance
+from instance import *
 from hummingbird_utils import *
 
 def extrapolate(method, known_data, target_value):
@@ -87,13 +89,14 @@ def main():
     for i, t in enumerate(thread_list):
         print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Bytes.'.format(target, t, predictions[i]))
 
-    reserved_mem = 8
+    reserved_mem = 1
     min_mem = [pred/1000/1000/1000 + reserved_mem for pred in predictions]
     valid, invalid = Instance.get_machine_types(config, min_mem)
     if valid:
         print('Sugguest to test on the following machine types:')
         for ins in valid:
             print(bcolors.OKGREEN + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
+            ins.set_price()
     else:
         print('No pre-defined machine types found.')
     if invalid:
@@ -101,15 +104,28 @@ def main():
         for ins in invalid:
             print(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
     print('Try customized machine type if necessary:')
+    cus_types = []
     for i, t in enumerate(thread_list):
         print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
+        cus_types.append(GCP_Instance('custom'+'-'+str(t), t, math.ceil(min_mem[i])))
+    cus = input('Do you want to include customized machine types? (Y/N): ')
+    if cus.lower() == 'y' or cus.lower() == 'yes':
+        for ins in cus_types:
+            price = input('Hourly price for {} core and {}GB memory:'.format(ins.cpu, ins.mem))
+            ins.set_price(price)
+        #valid += cus_types
 
     logging.info('Preparing runtime profiling...')
     profiler = Profiler(args.profile_tool, 'time', config)
     ds_size = int(target * 0.01)
-    rt_dict = profiler.profile({ds_size:ds_dict[ds_size]}, valid)
+    run_times = profiler.profile({ds_size:ds_dict[ds_size]}, valid)[ds_size]
     logging.info('Runtime profiling done.')
-    logging.debug(rt_dict)
+    logging.debug(run_times)
+    sorted_runtime = sorted(zip(run_times, valid))
+    costs = [(runtime * ins.price, ins) for runtime, ins in sorted_runtime]
+    sorted_costs = sorted(costs)
+    print('The fastest machine type is {}'.format(sorted_runtime[0][1].name))
+    print('The cheapest machine type is {}'.format(sorted_costs[0][1].name))
 
 if __name__ == "__main__":
     main()

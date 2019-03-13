@@ -128,7 +128,6 @@ class Profiler(object):
                 tsv_writer.writerow(headline)
 
                 for entry_count in input_dict:
-                    print(entry_count, humanize(entry_count))
                     result_path = self.conf['Profiling']['result'] + '/' + self.mode + '/' + machine.name + '_' + humanize(entry_count) + '.out'
                     result_dict[entry_count].append(result_path)
                     result_addr = output_base + result_path
