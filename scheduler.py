@@ -3,8 +3,6 @@ import logging
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
-    NO_JOB = 'NO_JOB'
-    job_pool = []
     def __init__(self, tool, conf):
         self.tool = tool
         if self.tool == 'dsub':

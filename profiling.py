@@ -165,3 +165,13 @@ class Profiler(object):
         for proc in procs:
             proc.wait()
         return result_dict
+
+# COMMAND = '''
+# dsub \
+# --provider google-v2 \
+# --project gbsc-gcp-project-cba \
+# --regions us-west1 \
+# --image quay.io/encode-dcc/atac-seq-pipeline:v1.1.3 \
+# --script cromwell.sh
+
+# '''

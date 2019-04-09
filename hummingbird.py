@@ -56,17 +56,20 @@ def regression(known_data, target_value):
 
 def main():
     """The main pipeline."""
-    parser = argparse.ArgumentParser(description='Process command line input')
-    parser.add_argument('-c', '--conf', dest='config_file',
-                        default='User_Provided_Input.conf')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('conf', help='Hummingbird configuration')
     parser.add_argument('-d', '--downsample', dest='downsample_tool',
-                        default='seqtk')
+                        choices=['seqtk', 'zless'],
+                        default='seqtk',
+                        help='the tool used for downsampling, default: %(default)s')
     parser.add_argument('-p', '--profiler', dest='profile_tool',
-                        default='time')
+                        choices=['time', 'valgrind'],
+                        default='time',
+                        help='the tool used for profiling, default: %(default)s')
     args = parser.parse_args()
 
     config = configparser.ConfigParser()
-    config.read(args.config_file)
+    config.read(args.conf)
 
     logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.DEBUG)
     logging.info('Preparing downsampling...')
