@@ -1,0 +1,41 @@
+{
+    "atac.qc_report.qc_json_ref" : "gs://encode-pipeline-test-samples/encode-atac-seq-pipeline/ref_output/v1.1.6/ENCSR356KRQ/qc.json",
+    "atac.pipeline_type" : "atac",
+    "atac.genome_tsv" : "gs://encode-pipeline-genome-data/hg38_google.tsv",
+    "atac.fastqs" : [
+        [
+            ["gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq_subsampled/rep1/pair1/ENCFF341MYG.subsampled.400.fastq.gz",
+             "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq_subsampled/rep1/pair2/ENCFF248EJF.subsampled.400.fastq.gz"]
+        ]
+    ],
+    "atac.adapters" : [
+        [
+            ["gs://gbsc-gcp-project-hummingbird-user-xingziye/tmp/adapter.txt",
+             "gs://gbsc-gcp-project-hummingbird-user-xingziye/tmp/adapter.txt"]
+        ]
+    ],
+
+    "atac.paired_end" : true,
+    "atac.multimapping" : 4,
+
+    "atac.auto_detect_adapter" : true,
+
+    "atac.trim_adapter.cpu" : 4,
+
+    "atac.bowtie2_cpu" : 4,
+    "atac.bowtie2_mem_mb" : 16000,
+
+    "atac.filter_cpu" : 4,
+    "atac.filter_mem_mb" : 12000,
+
+    "atac.macs2_mem_mb" : 16000,
+
+    "atac.smooth_win" : 73,
+    "atac.enable_idr" : true,
+    "atac.idr_thresh" : 0.05,
+
+    "atac.enable_xcor" : true,
+
+    "atac.title" : "ENCSR356KRQ_1M",
+    "atac.description" : "ATAC-seq on primary keratinocytes in day 0.0 of differentiation"
+}

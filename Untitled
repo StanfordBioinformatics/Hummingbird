@@ -1,0 +1,59 @@
+log.info('Removing unmapped/low-quality reads...')
+samtools view -F 524 -f 2 -u /data/ENCSR356KRQ_whole.bam | sambamba sort -n /dev/stdin -o ENCSR356KRQ_whole.tmp_filt.bam -t 4
+samtools view -h ENCSR356KRQ_whole.tmp_filt.bam -@ 4 | $(which assign_multimappers.py) -k 4 --paired-end | samtools fixmate -r /dev/stdin ENCSR356KRQ_whole.fixmate.bam
+samtools view -F 1804 -f 2 -u ENCSR356KRQ_whole.fixmate.bam | sambamba sort /dev/stdin -o ENCSR356KRQ_whole.filt.bam -t 4
+log.info('Marking dupes with {}...'.format(args.dup_marker))
+java -Xmx4G -XX:ParallelGCThreads=1 -jar /software/picard.jar MarkDuplicates INPUT=ENCSR356KRQ_whole.filt.bam OUTPUT=ENCSR356KRQ_whole.dupmark.bam METRICS_FILE=ENCSR356KRQ_whole.dup.qc VALIDATION_STRINGENCY=LENIENT USE_JDK_DEFLATER=TRUE USE_JDK_INFLATER=TRUE ASSUME_SORTED=true REMOVE_DUPLICATES=false
+sambamba markdup -t 4 --hash-table-size=17592186044416 --overflow-list-size=20000000 --io-buffer-size=256 ENCSR356KRQ_whole.filt.bam ENCSR356KRQ_whole.dupmark.bam 2> ENCSR356KRQ_whole.dup.qc
+log.info('Removing dupes...')
+samtools view -@ 4 -F 1804 -f 2 -b ENCSR356KRQ_whole.dupmark.bam > /data/ENCSR356KRQ_whole.nodup.bam
+
+
+
+samtools index ENCSR356KRQ_whole.dupmark.bam
+sambamba sort -n ENCSR356KRQ_whole.dupmark.bam -o ENCSR356KRQ_whole.nmsrt.bam -t 4
+sambamba index /data/ENCSR356KRQ_whole.nodup.bam -t 4 &
+sambamba flagstat /data/ENCSR356KRQ_whole.nodup.bam -t 4 > /data/ENCSR356KRQ_whole.flagstat.qc &
+bedtools bamtobed -bedpe -i ENCSR356KRQ_whole.nmsrt.bam | awk 'BEGIN{{OFS="\\t"}}{{print $1,$2,$4,$6,$9,$10}}' | grep -v "chrM" | sort | uniq -c | awk 'BEGIN{{mt=0;m0=0;m1=0;m2=0}} ($1==1){{m1=m1+1}} ($1==2){{m2=m2+1}} {{m0=m0+1}} {{mt=mt+$1}} END{{m1_m2=-1.0; if(m2>0) m1_m2=m1/m2; m0_mt=0; if (mt>0) m0_mt=m0/mt; m1_m0=0; if (m0>0) m1_m0=m1/m0; printf "%d\\t%d\\t%d\\t%d\\t%f\\t%f\\t%f\\n",mt,m0,m1,m2,m0_mt,m1_m0,m1_m2}}' > /data/ENCSR356KRQ_whole.pbc.qc &
+PID = $!
+wait $PID
+rm ENCSR356KRQ_whole.nmsrt.bam
+printf "mito_dups\\t$(samtools view -f 1024 -c ENCSR356KRQ_whole.dupmark.bam chrM)\\n" > /data/ENCSR356KRQ_whole.mito_dup.txt
+rm ENCSR356KRQ_whole.filt.bam
+rm ENCSR356KRQ_whole.dupmark.bam
+rm ENCSR356KRQ_whole.dupmark.bam.bai
+f1-micro         us-east4-b                 1     0.60
+
+
+cat call-ataqc/shard-0/execution/stderr.background
+cat call-bam2ta/shard-0/execution/stderr.background
+cat call-bowtie2/shard-0/execution/stderr.background
+cat call-filter/shard-0/execution/stderr.background
+cat call-idr_pr/shard-0/execution/stderr.background
+cat call-macs2/shard-0/execution/stderr.background
+cat call-macs2_pr1/shard-0/execution/stderr.background
+cat call-macs2_pr2/shard-0/execution/stderr.background
+cat call-overlap_pr/shard-0/execution/stderr.background
+cat call-spr/shard-0/execution/stderr.background
+cat call-trim_adapter/shard-0/execution/stderr.background
+cat call-xcor/shard-0/execution/stderr.background
+
+include required(classpath("application"))
+
+backend {
+  default = "Local"
+  providers {
+    Local {
+      actor-factory = "cromwell.backend.impl.sfs.config.ConfigBackendLifecycleActorFactory"
+      config {
+        concurrent-job-limit = 10
+        submit = "/usr/bin/time -f \"%M %e\" bash ${script}"
+      }
+    }
+  }
+}
+
+
+java -Dconfig.file=backend.conf -jar cromwell-34.jar run my_atac.wdl --inputs ENCSR356KRQ_whole.json -m meta_whole.json
+
+dsub --provider google-v2 --project gbsc-gcp-project-cba --regions us-west1 --image quay.io/encode-dcc/atac-seq-pipeline:v1.1.3 --script cromwell.sh --logging gs://gbsc-gcp-project-hummingbird-user-xingziye/logging --machine-type n1-standard-4 --keep-alive 3600 --output META_FILE=gs://gbsc-gcp-project-hummingbird-user-xingziye/tmp/meta.json --input CONF_FILE=gs://gbsc-gcp-project-hummingbird-user-xingziye/input/backend.conf WDL_FILE=gs://gbsc-gcp-project-hummingbird-user-xingziye/input/my_atac.wdl INPUT_FILE=gs://gbsc-gcp-project-hummingbird-user-xingziye/input/ENCSR356KRQ_1M.json
