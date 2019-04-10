@@ -7,6 +7,8 @@ import math
 import numpy as np
 from sklearn import linear_model
 from scipy.interpolate import Rbf, UnivariateSpline
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 from downsample import Downsample
@@ -47,7 +49,9 @@ def regression(known_data, target_value):
         y = ys[:,i]
         regr = linear_model.LinearRegression()
         regr.fit(X, y)
-        result.append(np.asscalar(regr.predict(target_value)))
+        # Reshape data using array.reshape(-1, 1) if your data has a single feature
+        target = np.array(target_value).reshape(-1, 1)
+        result.append(np.asscalar(regr.predict(target)))
 
         plt.subplot(len(ys[0]), 1, i + 1)
         plt.plot(x_test, regr.predict(x_test), 'b', X, y, 'ro')
