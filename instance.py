@@ -42,6 +42,22 @@ class Instance:
         else:
             self.mem = None
 
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if type(self) != type(other):
+            return False
+        if self.name == other.name and self.cpu == other.cpu and self.mem == other.mem:
+            return True
+        else:
+            return False
+
+    def __hash__(self):
+        return hash((self.name, self.cpu, self.mem))
+
+    def __repr__(self):
+        return '<{}-cpu, {}G mem>'.format(self.cpu, self.mem)
+
     def get_core(self):
         return str(self.cpu)
 
