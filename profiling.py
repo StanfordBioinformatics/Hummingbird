@@ -45,20 +45,20 @@ class Profiler(object):
             storage bucket.
 
         Args:
-            input_dict: A dict mapping a string of downsampled size to a list of
+            input_dict: A dict mapping the number of downsampled size to a list of
                 downsampled filenames.
 
         Returns:
-            A dict mapping a string of downsampled size to a list of
+            A dict mapping the number of downsampled size to a list of
                 memory/time usage sizes in the same order of threads specified in
                 config file.
         """
         if machines is None: # do nothing with empty list
             machines = list()
-            thread_list = self.conf.get('Profiling', 'thread', fallback="4").split(',')
+            thread_list = self.conf['Profiling'].get('thread', [4])
             for thread in thread_list:
-                thread = thread.strip()
-                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + thread, thread, None))
+                #thread = thread.strip()
+                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + str(thread), thread, None))
         if self.mode == 'mem':
             mode_str = '"%M"'
         elif self.mode == 'time':
@@ -93,7 +93,8 @@ class CromwellProfiler(BaseProfiler):
             CMD = '''apt-get -qq update
 apt-get -qq install time
 wget -nv -c https://github.com/broadinstitute/cromwell/releases/download/34/cromwell-34.jar
-java -Dconfig.file=${BACKEND_CONF} -jar cromwell-34.jar run ${WDL_FILE} --inputs ${INPUT_JSON} -m meta.json
+echo '{"final_workflow_outputs_dir": "/final_outputs"}' > options.json
+java -Dconfig.file=${BACKEND_CONF} -jar cromwell-34.jar run ${WDL_FILE} --inputs ${INPUT_JSON} -m meta.json -o options.json
 mkdir /call_logs
 for path in $(grep -Po '(?<="callRoot": ").*(?=")' meta.json)
 do
@@ -105,17 +106,17 @@ cp -r -T /call_logs ${RESULT_DIR}
 '''
             script.write(CMD)
         bucket_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
-        backend_conf = bucket_base + self.conf.get('Profiling', 'backend_conf')
-        wdl_file = bucket_base + self.conf.get('Profiling', 'wdl_file')
-        log_path = bucket_base + self.conf.get('Profiling', 'logging')
+        backend_conf = bucket_base + self.conf['Profiling']['backend_conf']
+        wdl_file = bucket_base + self.conf['Profiling']['wdl_file']
+        log_path = bucket_base + self.conf['Profiling']['logging']
         procs = []
         to_delete = []
-        for machine in machines:
+        for i, machine in enumerate(machines):
             scheduler = Scheduler('dsub', self.conf)
             scheduler.add_argument('--script', 'cromwell.sh')
             tsv_filename = 'cromwell_profiling_' + machine.name + '.tsv'
             to_delete.append(tsv_filename)
-            json_inputs = self.conf.get('Profiling', 'json_input[{}]'.format(machine.get_core())).splitlines()
+            json_inputs = self.conf['Profiling']['json_input'][i]
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--input BACKEND_CONF',
@@ -125,7 +126,7 @@ cp -r -T /call_logs ${RESULT_DIR}
                 tsv_writer.writerow(headline)
                 for entry_count, json_input in zip(input_dict, json_inputs):
                     json_input = bucket_base + json_input
-                    result_prefix = self.conf.get('Profiling', 'result') + '/' + self.mode + '/' + machine.name + '_' + humanize(entry_count)
+                    result_prefix = self.conf['Profiling']['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + self.mode + '/'
                     result_dict[entry_count].append(result_prefix)
                     result_dir = bucket_base + result_prefix
                     row = [backend_conf, wdl_file, json_input, result_dir]
@@ -151,23 +152,20 @@ class BashProfiler(BaseProfiler):
         """Perform profiling on given input.
 
         Args:
-            input_dict: A dict mapping a string of downsampled size to a list of
+            input_dict: A dict mapping the number of downsampled size to a list of
                 downsampled filenames.
 
         Returns:
-            A dict mapping a string of downsampled size to a list of
+            A dict mapping the number of downsampled size to a list of
                 paths of the results of memory/time usage profiling.
         """
-        dir_input = self.conf.get('Profiling', 'reference', fallback=None)
-        extra_input = self.conf.get('Profiling', 'extra_input', fallback="").splitlines()
-        extra_output = self.conf.get('Profiling', 'output', fallback="").splitlines()
-        output_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
-        log_path = output_base + self.conf['Downsample']['logging']
+        url_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
+        log_path = url_base + self.conf['Profiling']['logging']
         script_name = 'profiling.sh'
         result_dict = defaultdict(list)
 
         # Prepare profiling script
-        if self.conf.get('Profiling', 'script', fallback=None):
+        if self.conf['Profiling'].get('script'):
             if self.conf['Profiling']['script'] == script_name:
                 _, ext = os.path.splitext(script_name)
                 script_name = os.path.basename(script_name) + '_' + ext
@@ -188,6 +186,10 @@ class BashProfiler(BaseProfiler):
         # each machine type will have an individual tsv
         procs = []
         to_delete = []
+        def add_headline(flag):
+            if flag in self.conf["Profiling"]:
+                for key in self.conf["Profiling"][flag]:
+                    headline.append('--' + flag + ' ' + key)
         for machine in machines:
             #thread = thread.strip()
             scheduler = Scheduler('dsub', self.conf)
@@ -197,43 +199,29 @@ class BashProfiler(BaseProfiler):
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--env THREAD', '--output RESULT_FILE']
-                for i in range(1, len(input_dict.values()[0]) + 1):
-                    headline.append('--input INPUT_FILE' + str(i))
-                if dir_input:
-                    headline.append('--input-recursive REF_FILE')
-                # Add header for extra inputs other than downsampled input
-                for i, extra in enumerate(extra_input, start=1):
-                    if extra:
-                        headline.append('--input EXTRA_FILE' + str(i))
-                for i, output in enumerate(extra_output, start=1):
-                    if output:
-                        headline.append('--output OUTPUT_FILE' + str(i))
+                for key in self.conf["Downsample"]["input"]:
+                    headline.append('--input ' + key)
+                add_headline('input')
+                add_headline('input-recursive')
+                add_headline('output')
                 tsv_writer.writerow(headline)
 
                 for entry_count in input_dict:
-                    result_path = self.conf['Profiling']['result'] + '/' + self.mode + '/' + machine.name + '_' + humanize(entry_count)
+                    result_path = self.conf['Profiling']['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + self.mode + '/'
                     result_dict[entry_count].append(result_path)
-                    result_addr = output_base + result_path + '/script.txt'
-                    row = [machine.get_core(), result_addr] + input_dict[entry_count]
-                    if dir_input:
-                        row.append(dir_input)
-                    for extra in extra_input:
-                        extra = extra.strip()
-                        if extra:
-                            row.append(extra)
-                    for output in extra_output:
-                        output = output.strip()
-                        if output:
-                            output = output_base + output
-                            full_ext = ''
-                            while True:
-                                output, ext = os.path.splitext(output)
-                                if ext:
-                                    full_ext = ext + full_ext
-                                else:
-                                    break
-                            output = output + '_' + machine.get_core() + "_" + humanize(entry_count) + full_ext
-                            row.append(output)
+                    result_addr = url_base + result_path + 'script.txt'
+                    row = [str(machine.get_core()), result_addr] + input_dict[entry_count]
+                    if 'input' in self.conf['Profiling']:
+                        for path in self.conf['Profiling']['input'].values():
+                            row.append(url_base + path)
+                    if 'input-recursive' in self.conf['Profiling']:
+                        for path in self.conf['Profiling']['input-recursive'].values():
+                            row.append(url_base + path)
+                    if 'output' in self.conf['Profiling']:
+                        for path in self.conf['Profiling']['output'].values():
+                            basename, ext = os.path.splitext(path)
+                            path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
+                            row.append(url_base + path)
                     tsv_writer.writerow(row)
 
             scheduler.add_argument('--image', self.conf['Profiling']['image'])

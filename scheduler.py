@@ -9,7 +9,7 @@ class Scheduler(object):
             self.cmd = 'dsub'
             self.add_argument('--provider', 'google-v2')
             self.add_argument('--project', conf['Platform']['project'])
-            if conf.get('Platform', 'zones', fallback=None):
+            if 'zones' in conf['Platform']:
                 self.add_argument('--zones', conf['Platform']['zones'])
             else:
                 self.add_argument('--regions', conf['Platform']['regions'])

@@ -17,6 +17,7 @@ from hummingbird_utils import *
 # TEST_COMMAND = 'dsub --help'
 MACHINE_TYPE = 'n1-standard-4'
 DISK_SIZE = '500'
+SIZE_RUNTIME = 0.01
 
 class Downsample(object):
     """Generate subsamples for input data.
@@ -31,16 +32,18 @@ class Downsample(object):
 
     def subsample(self):
         """Generate subsamples for input data according to the input format."""
-        filenames = self.conf['Downsample']['input'].splitlines()
-        file_dict = defaultdict(list)
-        for filename in filenames:
-            filename = filename.strip()
-            base, extension = os.path.splitext(filename)
+        input_dict = self.conf['Downsample']['input']
+        fa_list = list()
+        for path in input_dict.values():
+            path = path.strip()
+            base, extension = os.path.splitext(path)
             while extension in ZIP_EXT:
                 base, extension = os.path.splitext(base)
             if extension.lower() in FA_EXT:
-                file_dict['fa'].append(filename)
-        return self.downsample_fa(file_dict['fa'])
+                fa_list.append(path)
+            else:
+                sys.exit("Unsupported input format.")
+        return self.downsample_fa(fa_list)
 
     def downsample_fa(self, filenames):
         """Generate FASTA/FASTQ downsampled files.
@@ -49,23 +52,21 @@ class Downsample(object):
             specified in conf.
 
         Args:
-            filenames: A list of strings which are the filenames of input that
+            filenames: A list of paths which are the input files that
                 need to be subsampled.
 
         Returns:
-            A dict mapping a string of downsampled size to a list of downsampled
+            A dict mapping the number of downsampled size to a list of downsampled
                 filenames.
         """
-        entry_counts = self.conf['Downsample']['size']
-        if entry_counts == 'auto':
-            entry_counts = ['0.001', '0.01', '0.1']
+        entry_counts = self.conf['Downsample'].get('size', [0.001, 0.01, 0.1])
+        if any([count < 1 for count in entry_counts]):
             self.tool = 'seqtk'
-        else:
-            entry_counts = entry_counts.split(',')
-        entry_counts = [entry.strip() for entry in entry_counts]
         # 1% downsample for runtime profiling
-        if '0.01' not in entry_counts:
-            entry_counts.append('0.01')
+        if self.tool == 'seqtk' and SIZE_RUNTIME not in entry_counts:
+            entry_counts.append(SIZE_RUNTIME)
+        elif self.tool == 'zless' and self.conf['Downsample']['target'] * SIZE_RUNTIME not in entry_counts:
+            entry_counts.append(self.conf['Downsample']['target'] * SIZE_RUNTIME)
         bucket_path = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
         log_path = bucket_path + '/' + self.conf['Downsample']['logging']
@@ -80,21 +81,13 @@ class Downsample(object):
                 while extension in ZIP_EXT:
                     base, extension = os.path.splitext(base)
                 for entry_count in entry_counts:
-                    if not entry_count.isdigit():
-                        try:
-                            target_size = int(self.conf['Downsample']['target'])
-                            entry_count = int(float(entry_count) * target_size)
-                            # numerical value exists according to equivalent fraction value
-                            if str(entry_count) in entry_counts:
-                                continue
-                        except ValueError:
-                            sys.exit("The downsample input size is invalid.")
-                    if self.tool == 'seqtk':
-                        target_file = os.path.basename(base) + '_seqtk_' + humanize(entry_count) + extension
-                    elif self.tool == 'zless':
-                        target_file = os.path.basename(base) + '_zless_' + humanize(entry_count) + extension
+                    if isinstance(entry_count, float):
+                        count_int = int(self.conf['Downsample']['target'] * entry_count)
+                    else:
+                        count_int = entry_count
+                    target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
                     target_path = '/'.join([bucket_path, output_path, target_file])
-                    downsampled[entry_count].append(target_path)
+                    downsampled[count_int].append(target_path)
                     if self.tool == 'seqtk':
                         tsv_writer.writerow([entry_count, filename, target_path])
                     elif self.tool == 'zless':

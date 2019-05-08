@@ -30,7 +30,7 @@ class Instance:
         service = conf['Platform']['service']
         service = service.lower()
         region = conf['Platform']['regions']
-        cpu_list = conf['Profiling']['thread'].split(',')
+        cpu_list = conf['Profiling'].get('thread', [4])
         if service == 'google' or service == 'gcp':
             return GCP_Instance.get_machine_types(region, cpu_list, min_mem)
 
