@@ -64,7 +64,7 @@ def main():
     """The main pipeline."""
     parser = argparse.ArgumentParser()
     parser.add_argument('conf', help='Hummingbird configuration')
-    parser.add_argument('-d', '--downsample', dest='downsample_tool',
+    parser.add_argument('--fa_downsample', dest='downsample_tool',
                         choices=['seqtk', 'zless'],
                         default='seqtk',
                         help='the tool used for downsampling, default: %(default)s')
@@ -76,15 +76,19 @@ def main():
 
     with open(args.conf, 'r') as config_file:
         config = json.load(config_file)
+        config['Downsample']['tool'] = args.downsample_tool
 
-    logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.DEBUG)
+    logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.INFO)
     logging.info('Preparing downsampling...')
-    downsampler = Downsample(args.downsample_tool, config)
+    downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
     logging.info('Downsampling done.')
-    logging.debug(ds_dict)
+    logging.info(ds_dict)
 
     for i, workflow in enumerate(config['Profiling']):
+        cont = input('Continue? (y/N): ')
+        if cont != 'y':
+            break
         if 'wdl_file' in workflow and 'backend_conf' in workflow:
             backend = 'cromwell'
         elif 'command' in workflow or 'script' in workflow:
@@ -100,7 +104,7 @@ def main():
         profiler = Profiler(backend, args.profile_tool, 'mem', wf_conf)
         profiling_dict = profiler.profile(ds_dict)
         logging.info('Memory profiling done.')
-        logging.debug(profiling_dict)
+        logging.info(profiling_dict)
 
         all_valid = set()
         all_invalid = set()
@@ -145,18 +149,21 @@ def main():
         all_valid.difference_update(all_invalid)
         logging.info('Preparing runtime profiling...')
         profiler = Profiler(backend, args.profile_tool, 'time', wf_conf)
-        ds_size = int(target * 0.01)
+        if config['Downsample'].get('fullrun', False):
+            ds_size = target
+        else:
+            ds_size = int(target * Downsample.runtime_size)
         run_times = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
         logging.info('Runtime profiling done.')
-        logging.debug(run_times)
+        logging.info(run_times)
         for task in run_times:
             print('==' + task + '==')
             run_time = run_times[task][ds_size]
             sorted_runtime = sorted(zip(run_time, all_valid))
             costs = [(t * ins.price, ins) for t, ins in sorted_runtime]
             sorted_costs = sorted(costs)
-            print('The fastest machine type is {}'.format(sorted_runtime[0][1].name))
-            print('The cheapest machine type is {}'.format(sorted_costs[0][1].name))
+            print('The fastest machine type: {}'.format(sorted_runtime[0][1].name))
+            print('The cheapest machine type: {}'.format(sorted_costs[0][1].name))
 
 if __name__ == "__main__":
     main()

@@ -93,17 +93,25 @@ class CromwellProfiler(BaseProfiler):
             CMD = '''apt-get -qq update
 apt-get -qq install time
 wget -nv -c https://github.com/broadinstitute/cromwell/releases/download/34/cromwell-34.jar
-echo '{"final_workflow_outputs_dir": "/final_outputs"}' > options.json
+echo '{"final_workflow_outputs_dir": "/mnt/data/final_outputs"}' > options.json
+'''
+            if 'imports' in self.conf['Profiling']:
+                CMD += '''unzip ${IMPORT_ZIP}'''
+            CMD += '''
 java -Dconfig.file=${BACKEND_CONF} -jar cromwell-34.jar run ${WDL_FILE} --inputs ${INPUT_JSON} -m meta.json -o options.json
-mkdir /call_logs
+mkdir /mnt/data/call_logs
 for path in $(grep -Po '(?<="callRoot": ").*(?=")' meta.json)
 do
     call=$(grep -Po '(?<=\/call-)[^\/]*' <<< $path)
-    mkdir /call_logs/$call
-    grep -Po '^(\d*\.)?\d+' $path/execution/stderr.background > /call_logs/$call.txt
+    grep -Po '%s' $path/execution/stderr.background > /mnt/data/call_logs/$call.txt
 done
-cp -r -T /call_logs ${RESULT_DIR}
+cp -r -T /mnt/data/call_logs ${RESULT_DIR}
+find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
 '''
+            if self.mode == 'mem':
+                CMD = CMD % '^(\d*\.)?\d+'
+            else:
+                CMD = CMD % '(\d*\.)?\d+$'
             script.write(CMD)
         bucket_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
         backend_conf = bucket_base + self.conf['Profiling']['backend_conf']
@@ -122,14 +130,26 @@ cp -r -T /call_logs ${RESULT_DIR}
                 headline = ['--input BACKEND_CONF',
                             '--input WDL_FILE',
                             '--input INPUT_JSON',
-                            '--output-recursive RESULT_DIR']
+                            '--output-recursive RESULT_DIR',
+                            '--output-recursive OUTPUT_DIR']
+                if 'imports' in self.conf['Profiling']:
+                    headline += ['--input IMPORT_ZIP']
+                    import_zip = bucket_base + self.conf['Profiling']['imports']
+                else:
+                    import_zip = None
                 tsv_writer.writerow(headline)
-                for entry_count, json_input in zip(input_dict, json_inputs):
+                for entry_count, json_input in zip(self.conf['Downsample']['count'], json_inputs):
+                    # Enforce the entry_count has the same order as json inputs
+                    if entry_count not in input_dict:
+                        continue
                     json_input = bucket_base + json_input
                     result_prefix = self.conf['Profiling']['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + self.mode + '/'
                     result_dict[entry_count].append(result_prefix)
                     result_dir = bucket_base + result_prefix
-                    row = [backend_conf, wdl_file, json_input, result_dir]
+                    output_dir = bucket_base + self.conf['Profiling']['output'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/'
+                    row = [backend_conf, wdl_file, json_input, result_dir, output_dir]
+                    if import_zip:
+                        row += [import_zip]
                     tsv_writer.writerow(row)
             scheduler.add_argument('--image', self.conf['Profiling']['image'])
             scheduler.add_argument('--tasks', tsv_filename)
@@ -201,7 +221,7 @@ class BashProfiler(BaseProfiler):
                 headline = ['--env THREAD', '--output RESULT_FILE']
                 for key in self.conf["Downsample"]["input"]:
                     headline.append('--input ' + key)
-                add_headline('input')
+                add_headline('input') # additional inputs for profiling stage
                 add_headline('input-recursive')
                 add_headline('output')
                 tsv_writer.writerow(headline)

@@ -1,5 +1,8 @@
 FA_EXT = ['.fa', '.fasta', '.fq', '.fastq']
+SAM_EXT = ['.sam', '.bam', 'ubam']
 ZIP_EXT = ['.gz']
+FA = 'fa'
+SAM = 'sam'
 
 class bcolors:
     HEADER = '\033[95m'

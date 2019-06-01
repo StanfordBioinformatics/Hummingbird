@@ -18,25 +18,28 @@
     {
       "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
       "logging": "logging/atac-pipeline",
-      "thread": [2, 4],
+      "thread": [2, 4, 8],
       "result": "result/atac-pipeline",
       "wdl_file": "input/my_atac.wdl",
       "backend_conf": "input/backend.conf",
       "json_input": [
         [
-          "input/ENCSR356KRQ_76K_2.json",
-          "input/ENCSR356KRQ_760K_2.json",
-          "input/ENCSR356KRQ_7600K_2.json"
+          "input/atac-seq-pipeline/ENCSR356KRQ_76K_2.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_760K_2.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_7600K_2.json"
         ],
         [
-          "input/ENCSR356KRQ_76K_4.json",
-          "input/ENCSR356KRQ_760K_4.json",
-          "input/ENCSR356KRQ_7600K_4.json"
+          "input/atac-seq-pipeline/ENCSR356KRQ_76K_4.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_760K_4.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_7600K_4.json"
+        ],
+        [
+          "input/atac-seq-pipeline/ENCSR356KRQ_76K_8.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_760K_8.json",
+          "input/atac-seq-pipeline/ENCSR356KRQ_7600K_8.json"
         ]
       ],
-      "output": {
-        "OUTPUT": "output/ENCODE/atac-seq-pipeline"
-      }
+      "output": "output/ENCODE/atac-seq-pipeline"
     }
   ]
 }
