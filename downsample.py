@@ -10,7 +10,7 @@ class Downsample(object):
 
     Attributes:
         conf: A dictionary of configrations.
-        tool: A string describing downsample methods for fasta/fastq files.
+        tool: A string describing downsample methods for input files.
         target: An integer indicating the size of whole input.
         sizes: An array of downsample size parameters for tool.
         counts: An array of actual downsampled sample size.
@@ -81,6 +81,8 @@ class Downsample(object):
         # This condition avoids empty dsub tsv input.
         if len(self.counts) == 1 and self.counts[0] == self.conf['Downsample']['target']:
             return {self.conf['Downsample']['target']: filenames}
+        if type == SAM:
+            self.tool = 'picard'
         bucket_dir = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
         log_path = bucket_dir + '/' + self.conf['Downsample']['logging']
@@ -102,7 +104,7 @@ class Downsample(object):
                     target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
                     target_path = '/'.join([bucket_dir, output_path, target_file])
                     downsampled[count_int][key] = target_path
-                    if type == 'sam':
+                    if self.tool == 'picard':
                         tsv_writer.writerow([size, filename, target_path])
                     elif self.tool == 'seqtk':
                         tsv_writer.writerow([size, filename, target_path])
@@ -112,9 +114,9 @@ class Downsample(object):
                         sys.exit()
 
         scheduler = Scheduler('dsub', self.conf)
-        if type == 'sam':
+        if self.tool == 'picard':
             scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
-            scheduler.add_argument('--command', "'java -jar picard.jar DownsampleSam I=${INPUT_FILE} O=${OUTPUT_FILE} STRATEGY=Chained P=${COUNT} ACCURACY=0.0001'")
+            scheduler.add_argument('--command', "'java -jar /app/picard.jar DownsampleSam -I ${INPUT_FILE} -O ${OUTPUT_FILE} -STRATEGY Chained -P ${COUNT} -ACCURACY 0.0001'")
         elif self.tool == 'seqtk':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
             scheduler.add_argument('--command', "'seqtk sample ${INPUT_FILE} ${COUNT} > ${OUTPUT_FILE}'")
