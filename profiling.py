@@ -90,8 +90,9 @@ class CromwellProfiler(BaseProfiler):
     def profile(self, format, input_dict, machines):
         result_dict = defaultdict(list)
         with open('cromwell.sh', 'w') as script:
-            CMD = '''apt-get -qq update
-apt-get -qq install time
+            CMD = '''echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+apt-get -qq update
+apt-get -qq install time wget
 wget -nv -c https://github.com/broadinstitute/cromwell/releases/download/34/cromwell-34.jar
 echo '{"final_workflow_outputs_dir": "/mnt/data/final_outputs"}' > options.json
 '''
@@ -230,7 +231,7 @@ class BashProfiler(BaseProfiler):
                     result_path = self.conf['Profiling']['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + self.mode + '/'
                     result_dict[entry_count].append(result_path)
                     result_addr = url_base + result_path + 'script.txt'
-                    row = [str(machine.get_core()), result_addr] + input_dict[entry_count]
+                    row = [str(machine.get_core()), result_addr] + input_dict[entry_count].values()
                     if 'input' in self.conf['Profiling']:
                         for path in self.conf['Profiling']['input'].values():
                             row.append(url_base + path)

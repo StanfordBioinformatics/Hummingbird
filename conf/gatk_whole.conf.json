@@ -23,7 +23,7 @@
       "command": "/gatk/gatk --java-options \"-Xmx32G -Djava.io.tmpdir='pwd'/tmp\" FastqToSam -TMP_DIR 'pwd'/tmp -F1 ${FASTQ_1} -F2 ${FASTQ_2} -O ${UBAM} -RG RG1 -SM ERR194159 -PL ILLUMINA -MAX_RECORDS_IN_RAM 10000000",
       "output": {
         "UBAM": "output/gatk-mvp/fastqtoubam/ERR194159.ubam"
-        }
+      }
     },
     {
       "image": "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.3.2-1510681135",

@@ -116,7 +116,7 @@ class Downsample(object):
         scheduler = Scheduler('dsub', self.conf)
         if self.tool == 'picard':
             scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
-            scheduler.add_argument('--command', "'java -jar /app/picard.jar DownsampleSam -I ${INPUT_FILE} -O ${OUTPUT_FILE} -STRATEGY Chained -P ${COUNT} -ACCURACY 0.0001'")
+            scheduler.add_argument('--command', "'java -jar /app/picard.jar DownsampleSam I=${INPUT_FILE} O=${OUTPUT_FILE} STRATEGY=Chained P=${COUNT} ACCURACY=0.0001'")
         elif self.tool == 'seqtk':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
             scheduler.add_argument('--command', "'seqtk sample ${INPUT_FILE} ${COUNT} > ${OUTPUT_FILE}'")
