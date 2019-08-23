@@ -149,21 +149,27 @@ def main():
         all_valid.difference_update(all_invalid)
         logging.info('Preparing runtime profiling...')
         profiler = Profiler(backend, args.profile_tool, 'time', wf_conf)
+        # TODO: target unassinged if profiling_dict is empty
         if config['Downsample'].get('fullrun', False):
             ds_size = target
         else:
             ds_size = int(target * Downsample.runtime_size)
-        run_times = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
+        runtimes_dict = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
         logging.info('Runtime profiling done.')
-        logging.info(run_times)
-        for task in run_times:
+        logging.info(runtimes_dict)
+        for task in runtimes_dict:
             print('==' + task + '==')
-            run_time = run_times[task][ds_size]
-            sorted_runtime = sorted(zip(run_time, all_valid))
-            costs = [(t * ins.price, ins) for t, ins in sorted_runtime]
-            sorted_costs = sorted(costs)
-            print('The fastest machine type: {}'.format(sorted_runtime[0][1].name))
+            runtimes = runtimes_dict[task][ds_size]
+            sorted_runtimes = sorted(zip(runtimes, all_valid))
+            prices = [ins.price for ins in all_valid]
+            costs = [t * p for t, p in zip(runtimes, prices)]
+            #costs = [(t * ins.price, ins) for t, ins in sorted_runtimes]
+            sorted_costs = sorted(zip(costs, all_valid))
+            efficiencies = cost_efficiency(runtimes, costs)
+            sorted_efficiencies = sorted(zip(efficiencies, all_valid), reverse=True)
+            print('The fastest machine type: {}'.format(sorted_runtimes[0][1].name))
             print('The cheapest machine type: {}'.format(sorted_costs[0][1].name))
+            print('The most cost-efficient machine type: {}'.format(sorted_efficiencies[0][1].name))
 
 if __name__ == "__main__":
     main()

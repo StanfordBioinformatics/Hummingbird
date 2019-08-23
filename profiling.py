@@ -20,6 +20,7 @@ except ImportError:
 # --tasks dsub.tsv
 # '''
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
+DEFAULT_THREAD = 4
 
 class Profiler(object):
     """Profile and collect the results for subsampled input data.
@@ -55,7 +56,7 @@ class Profiler(object):
         """
         if machines is None: # do nothing with empty list
             machines = list()
-            thread_list = self.conf['Profiling'].get('thread', [4])
+            thread_list = self.conf['Profiling'].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
                 #thread = thread.strip()
                 machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + str(thread), thread, None))
@@ -120,12 +121,13 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
         log_path = bucket_base + self.conf['Profiling']['logging']
         procs = []
         to_delete = []
-        for i, machine in enumerate(machines):
+        for machine in machines:
             scheduler = Scheduler('dsub', self.conf)
             scheduler.add_argument('--script', 'cromwell.sh')
             tsv_filename = 'cromwell_profiling_' + machine.name + '.tsv'
             to_delete.append(tsv_filename)
-            json_inputs = self.conf['Profiling']['json_input'][i]
+            thread_list = self.conf['Profiling'].get('thread', [DEFAULT_THREAD])
+            json_inputs = self.conf['Profiling']['json_input'][thread_list.index(machine.cpu)]
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--input BACKEND_CONF',
@@ -156,6 +158,7 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
+            scheduler.add_argument('--boot-disk-size', '50') # google providers put the Docker container's /tmp directory on the boot disk, 10 GB by defualt
             scheduler.add_argument('--wait')
             scheduler.add_argument('--skip')
             proc = scheduler.run()
@@ -240,8 +243,12 @@ class BashProfiler(BaseProfiler):
                             row.append(url_base + path)
                     if 'output' in self.conf['Profiling']:
                         for path in self.conf['Profiling']['output'].values():
+                            extension = ""
                             basename, ext = os.path.splitext(path)
-                            path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
+                            while ext:
+                                extension = ext + extension
+                                basename, ext = os.path.splitext(basename)
+                            path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + extension
                             row.append(url_base + path)
                     tsv_writer.writerow(row)
 

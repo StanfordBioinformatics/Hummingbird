@@ -1,3 +1,5 @@
+import numpy as np
+
 FA_EXT = ['.fa', '.fasta', '.fq', '.fastq']
 SAM_EXT = ['.sam', '.bam', 'ubam']
 ZIP_EXT = ['.gz']
@@ -26,3 +28,8 @@ def humanize(num):
         else:
             num /= 1000
     return "%d%s" % (num, 'G')
+
+def cost_efficiency(run_times, costs):
+    """Compute the cost efficiency as the metrics of instance."""
+    speedups = np.reciprocal(run_times)
+    return speedups / costs

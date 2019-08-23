@@ -82,7 +82,7 @@ class Downsample(object):
         if len(self.counts) == 1 and self.counts[0] == self.conf['Downsample']['target']:
             return {self.conf['Downsample']['target']: filenames}
         if type == SAM:
-            self.tool = 'picard'
+            self.tool = 'samtools'
         bucket_dir = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
         log_path = bucket_dir + '/' + self.conf['Downsample']['logging']
@@ -104,9 +104,7 @@ class Downsample(object):
                     target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
                     target_path = '/'.join([bucket_dir, output_path, target_file])
                     downsampled[count_int][key] = target_path
-                    if self.tool == 'picard':
-                        tsv_writer.writerow([size, filename, target_path])
-                    elif self.tool == 'seqtk':
+                    if self.tool in ['picard', 'samtools', 'seqtk']:
                         tsv_writer.writerow([size, filename, target_path])
                     elif self.tool == 'zless':
                         tsv_writer.writerow([size * 4, filename, target_path])
@@ -117,6 +115,9 @@ class Downsample(object):
         if self.tool == 'picard':
             scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
             scheduler.add_argument('--command', "'java -jar /app/picard.jar DownsampleSam I=${INPUT_FILE} O=${OUTPUT_FILE} STRATEGY=Chained P=${COUNT} ACCURACY=0.0001'")
+        elif self.tool == 'samtools':
+            scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
+            scheduler.add_argument('--command', "'samtools view -bs ${COUNT} ${INPUT_FILE} > ${OUTPUT_FILE}'")
         elif self.tool == 'seqtk':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
             scheduler.add_argument('--command', "'seqtk sample ${INPUT_FILE} ${COUNT} > ${OUTPUT_FILE}'")
