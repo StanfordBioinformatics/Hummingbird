@@ -1,10 +1,14 @@
 import numpy as np
 
-FA_EXT = ['.fa', '.fasta', '.fq', '.fastq']
-SAM_EXT = ['.sam', '.bam', 'ubam']
+FA_EXT = ['.fa', '.fasta']
+FQ_EXT = ['.fq', '.fastq']
+SAM_EXT = ['.sam']
+BAM_EXT = ['.bam', 'ubam', 'cram']
 ZIP_EXT = ['.gz']
 FA = 'fa'
+FQ = 'fq'
 SAM = 'sam'
+BAM = 'bam'
 
 class bcolors:
     HEADER = '\033[95m'

@@ -24,6 +24,7 @@ class Downsample(object):
         self.tool = conf['Downsample']['tool']
         self.target = conf['Downsample']['target']
         self.sizes = conf['Downsample'].get('size', [])
+        self.index = conf['Downsample'].get('index', False)
         fullrun = conf['Downsample'].get('fullrun', False)
         if fullrun:
             self.sizes += [self.target]
@@ -52,10 +53,15 @@ class Downsample(object):
             base, extension = os.path.splitext(path)
             while extension in ZIP_EXT:
                 base, extension = os.path.splitext(base)
-            if extension.lower() in FA_EXT:
+            ext = extension.lower()
+            if ext in FA_EXT:
                 type_dict[FA][key] = path
-            elif extension.lower() in SAM_EXT:
+            elif ext in FQ_EXT:
+                type_dict[FQ][key] = path
+            elif ext in SAM_EXT:
                 type_dict[SAM][key] = path
+            elif ext in BAM_EXT:
+                type_dict[BAM][key] = path
             else:
                 sys.exit("Unsupported input format.")
 
@@ -81,7 +87,7 @@ class Downsample(object):
         # This condition avoids empty dsub tsv input.
         if len(self.counts) == 1 and self.counts[0] == self.conf['Downsample']['target']:
             return {self.conf['Downsample']['target']: filenames}
-        if type == SAM:
+        if type == SAM or type == BAM:
             self.tool = 'samtools'
         bucket_dir = 'gs://' + self.conf['Platform']['bucket']
         output_path = self.conf['Downsample']['output'].strip('/')
@@ -90,7 +96,10 @@ class Downsample(object):
 
         with open('downsample.tsv', 'w') as dsub_tsv:
             tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
-            tsv_writer.writerow(['--env COUNT', '--input INPUT_FILE', '--output OUTPUT_FILE'])
+            row = ['--env COUNT', '--input INPUT_FILE', '--output OUTPUT_FILE']
+            if self.index:
+                row.append('--output OUTPUT_INDEX')
+            tsv_writer.writerow(row)
 
             for key in filenames:
                 filename = filenames[key]
@@ -98,32 +107,53 @@ class Downsample(object):
                 while extension in ZIP_EXT:
                     base, extension = os.path.splitext(base)
                 for size, count_int in zip(self.sizes, self.counts):
-                    if count_int == self.conf['Downsample']['target']:
+                    if count_int == self.conf['Downsample']['target']: #fullrun
                         downsampled[count_int][key] = filename
                         continue
                     target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
                     target_path = '/'.join([bucket_dir, output_path, target_file])
                     downsampled[count_int][key] = target_path
                     if self.tool in ['picard', 'samtools', 'seqtk']:
-                        tsv_writer.writerow([size, filename, target_path])
+                        row = [size, filename, target_path]
                     elif self.tool == 'zless':
-                        tsv_writer.writerow([size * 4, filename, target_path])
+                        row = [size * 4, filename, target_path]
                     else:
                         sys.exit()
+                    if self.index: # To index the downsampled file
+                        if type == BAM:
+                            ext = '.bai'
+                        elif type == FA or type == FQ:
+                            ext = '.fai'
+                        else:
+                            sys.exit()
+                        idx_key = key + '_IDX'
+                        index_path = target_path + ext
+                        downsampled[count_int][idx_key] = index_path
+                        row.append(index_path)
+                    tsv_writer.writerow(row)
 
         scheduler = Scheduler('dsub', self.conf)
         if self.tool == 'picard':
             scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
-            scheduler.add_argument('--command', "'java -jar /app/picard.jar DownsampleSam I=${INPUT_FILE} O=${OUTPUT_FILE} STRATEGY=Chained P=${COUNT} ACCURACY=0.0001'")
+            command = "'java -jar /app/picard.jar DownsampleSam I=${INPUT_FILE} O=${OUTPUT_FILE} STRATEGY=Chained P=${COUNT} ACCURACY=0.0001'"
         elif self.tool == 'samtools':
             scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
-            scheduler.add_argument('--command', "'samtools view -bs ${COUNT} ${INPUT_FILE} > ${OUTPUT_FILE}'")
+            command = "'samtools view -bs ${COUNT} ${INPUT_FILE} > ${OUTPUT_FILE}'"
         elif self.tool == 'seqtk':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
-            scheduler.add_argument('--command', "'seqtk sample ${INPUT_FILE} ${COUNT} > ${OUTPUT_FILE}'")
+            command = "'seqtk sample ${INPUT_FILE} ${COUNT} > ${OUTPUT_FILE}'"
         elif self.tool == 'zless':
             scheduler.add_argument('--image', 'xingziye/seqtk:latest')
-            scheduler.add_argument('--command', "'zless ${INPUT_FILE} | head -n ${COUNT} > ${OUTPUT_FILE}'")
+            command = "'zless ${INPUT_FILE} | head -n ${COUNT} > ${OUTPUT_FILE}'"
+        if self.index:
+            command = command.rstrip("'")
+            if type == FA:
+                command += "; samtools faidx ${OUTPUT_FILE} -o ${OUTPUT_INDEX}'"
+            elif type == FQ:
+                command += "; samtools fqidx ${OUTPUT_FILE} -o ${OUTPUT_INDEX}'"
+            else:
+                command += "; samtools index ${OUTPUT_FILE} ${OUTPUT_INDEX}'"
+        scheduler.add_argument('--command', command)
         scheduler.add_argument('--tasks', 'downsample.tsv')
         scheduler.add_argument('--logging', log_path)
         scheduler.add_argument('--machine-type', Downsample.default_instance)

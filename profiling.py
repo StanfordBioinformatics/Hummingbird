@@ -20,7 +20,7 @@ except ImportError:
 # --tasks dsub.tsv
 # '''
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
-DEFAULT_THREAD = 4
+DEFAULT_THREAD = 8
 
 class Profiler(object):
     """Profile and collect the results for subsampled input data.
@@ -223,7 +223,9 @@ class BashProfiler(BaseProfiler):
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--env THREAD', '--output RESULT_FILE']
-                for key in self.conf["Downsample"]["input"]:
+                any_count, any_input_dict = input_dict.popitem() # Pick an arbitrary element to get keys including index and put item back
+                input_dict[any_count] = any_input_dict
+                for key in any_input_dict.keys():
                     headline.append('--input ' + key)
                 add_headline('input') # additional inputs for profiling stage
                 add_headline('input-recursive')
@@ -237,10 +239,16 @@ class BashProfiler(BaseProfiler):
                     row = [str(machine.get_core()), result_addr] + input_dict[entry_count].values()
                     if 'input' in self.conf['Profiling']:
                         for path in self.conf['Profiling']['input'].values():
-                            row.append(url_base + path)
+                            if path.startswith("gs://"):
+                                row.append(path)
+                            else:
+                                row.append(url_base + path)
                     if 'input-recursive' in self.conf['Profiling']:
                         for path in self.conf['Profiling']['input-recursive'].values():
-                            row.append(url_base + path)
+                            if path.startswith("gs://"):
+                                row.append(path)
+                            else:
+                                row.append(url_base + path)
                     if 'output' in self.conf['Profiling']:
                         for path in self.conf['Profiling']['output'].values():
                             extension = ""
