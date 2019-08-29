@@ -1,6 +1,8 @@
 import os
 import csv
 import time
+import tempfile
+import shutil
 from collections import defaultdict
 from google.cloud import storage
 from instance import *
@@ -90,42 +92,41 @@ class BaseProfiler(object):
 class CromwellProfiler(BaseProfiler):
     def profile(self, format, input_dict, machines):
         result_dict = defaultdict(list)
-        with open('cromwell.sh', 'w') as script:
-            CMD = '''echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+        dsub_script = tempfile.NamedTemporaryFile()
+        CMD = '''echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 apt-get -qq update
 apt-get -qq install time wget
 wget -nv -c https://github.com/broadinstitute/cromwell/releases/download/34/cromwell-34.jar
 echo '{"final_workflow_outputs_dir": "/mnt/data/final_outputs"}' > options.json
 '''
-            if 'imports' in self.conf['Profiling']:
-                CMD += '''unzip ${IMPORT_ZIP}'''
-            CMD += '''
+        if 'imports' in self.conf['Profiling']:
+            CMD += '''unzip ${IMPORT_ZIP}'''
+        CMD += '''
 java -Dconfig.file=${BACKEND_CONF} -jar cromwell-34.jar run ${WDL_FILE} --inputs ${INPUT_JSON} -m meta.json -o options.json
 mkdir /mnt/data/call_logs
 for path in $(grep -Po '(?<="callRoot": ").*(?=")' meta.json)
 do
-    call=$(grep -Po '(?<=\/call-)[^\/]*' <<< $path)
-    grep -Po '%s' $path/execution/stderr.background > /mnt/data/call_logs/$call.txt
+call=$(grep -Po '(?<=\/call-)[^\/]*' <<< $path)
+grep -Po '%s' $path/execution/stderr.background > /mnt/data/call_logs/$call.txt
 done
 cp -r -T /mnt/data/call_logs ${RESULT_DIR}
 find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
 '''
-            if self.mode == 'mem':
-                CMD = CMD % '^(\d*\.)?\d+'
-            else:
-                CMD = CMD % '(\d*\.)?\d+$'
-            script.write(CMD)
+        if self.mode == 'mem':
+            CMD = CMD % '^(\d*\.)?\d+'
+        else:
+            CMD = CMD % '(\d*\.)?\d+$'
+        dsub_script.write(CMD)
         bucket_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
         backend_conf = bucket_base + self.conf['Profiling']['backend_conf']
         wdl_file = bucket_base + self.conf['Profiling']['wdl_file']
         log_path = bucket_base + self.conf['Profiling']['logging']
         procs = []
-        to_delete = []
+        temp = tempfile.mkdtemp()
         for machine in machines:
             scheduler = Scheduler('dsub', self.conf)
-            scheduler.add_argument('--script', 'cromwell.sh')
-            tsv_filename = 'cromwell_profiling_' + machine.name + '.tsv'
-            to_delete.append(tsv_filename)
+            scheduler.add_argument('--script', dsub_script.name)
+            tsv_filename = os.path.join(temp, 'cromwell_profiling_' + machine.name + '.tsv')
             thread_list = self.conf['Profiling'].get('thread', [DEFAULT_THREAD])
             json_inputs = self.conf['Profiling']['json_input'][thread_list.index(machine.cpu)]
             with open(tsv_filename, 'w') as dsub_tsv:
@@ -167,8 +168,8 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
 
         for proc in procs:
             proc.wait()
-        for file in to_delete:
-            os.remove(file)
+        dsub_script.close()
+        shutil.rmtree(temp)
         return result_dict
 
 class BashProfiler(BaseProfiler):
@@ -185,31 +186,27 @@ class BashProfiler(BaseProfiler):
         """
         url_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
         log_path = url_base + self.conf['Profiling']['logging']
-        script_name = 'profiling.sh'
+        dsub_script = tempfile.NamedTemporaryFile()
         result_dict = defaultdict(list)
 
         # Prepare profiling script
         if self.conf['Profiling'].get('script'):
-            if self.conf['Profiling']['script'] == script_name:
-                _, ext = os.path.splitext(script_name)
-                script_name = os.path.basename(script_name) + '_' + ext
-            with open(self.conf['Profiling']['script'], 'r') as ori, open(script_name, 'w') as copy:
-                copy.write('apt-get -qq update\n')
-                copy.write('apt-get -qq install time\n')
+            with open(self.conf['Profiling']['script'], 'r') as ori:
+                dsub_script.write('apt-get -qq update\n')
+                dsub_script.write('apt-get -qq install time\n')
                 for line in ori:
-                    copy.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
+                    dsub_script.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
         else:
-            with open(script_name, 'w') as script:
-                script.write('apt-get -qq update\n')
-                script.write('apt-get -qq install time\n')
-                for line in self.conf['Profiling']['command'].splitlines():
-                    script.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
+            dsub_script.write('apt-get -qq update\n')
+            dsub_script.write('apt-get -qq install time\n')
+            for line in self.conf['Profiling']['command'].splitlines():
+                dsub_script.write('/usr/bin/time -f {} -o ${{RESULT_FILE}} -a '.format(format) + line + '\n')
 
         # Prepare dsub tsv file and run
         # dsub only one type of machine at a time
         # each machine type will have an individual tsv
         procs = []
-        to_delete = []
+        temp = tempfile.mkdtemp()
         def add_headline(flag):
             if flag in self.conf["Profiling"]:
                 for key in self.conf["Profiling"][flag]:
@@ -217,9 +214,8 @@ class BashProfiler(BaseProfiler):
         for machine in machines:
             #thread = thread.strip()
             scheduler = Scheduler('dsub', self.conf)
-            scheduler.add_argument('--script', script_name)
-            tsv_filename = 'profiling_' + machine.name + '.tsv'
-            to_delete.append(tsv_filename)
+            scheduler.add_argument('--script', dsub_script.name)
+            tsv_filename = os.path.join(temp, 'profiling_' + machine.name + '.tsv')
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--env THREAD', '--output RESULT_FILE']
@@ -272,8 +268,8 @@ class BashProfiler(BaseProfiler):
 
         for proc in procs:
             proc.wait()
-        for file in to_delete:
-            os.remove(file)
+        dsub_script.close()
+        shutil.rmtree(temp)
         return result_dict
 
 # COMMAND = '''

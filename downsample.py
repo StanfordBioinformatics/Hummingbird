@@ -1,6 +1,7 @@
 import os
 import csv
 import sys
+import tempfile
 from collections import defaultdict
 from scheduler import Scheduler
 from hummingbird_utils import *
@@ -94,43 +95,43 @@ class Downsample(object):
         log_path = bucket_dir + '/' + self.conf['Downsample']['logging']
         downsampled = defaultdict(dict)
 
-        with open('downsample.tsv', 'w') as dsub_tsv:
-            tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
-            row = ['--env COUNT', '--input INPUT_FILE', '--output OUTPUT_FILE']
-            if self.index:
-                row.append('--output OUTPUT_INDEX')
-            tsv_writer.writerow(row)
+        dsub_tsv = tempfile.NamedTemporaryFile()
+        tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
+        row = ['--env COUNT', '--input INPUT_FILE', '--output OUTPUT_FILE']
+        if self.index:
+            row.append('--output OUTPUT_INDEX')
+        tsv_writer.writerow(row)
 
-            for key in filenames:
-                filename = filenames[key]
-                base, extension = os.path.splitext(filename)
-                while extension in ZIP_EXT:
-                    base, extension = os.path.splitext(base)
-                for size, count_int in zip(self.sizes, self.counts):
-                    if count_int == self.conf['Downsample']['target']: #fullrun
-                        downsampled[count_int][key] = filename
-                        continue
-                    target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
-                    target_path = '/'.join([bucket_dir, output_path, target_file])
-                    downsampled[count_int][key] = target_path
-                    if self.tool in ['picard', 'samtools', 'seqtk']:
-                        row = [size, filename, target_path]
-                    elif self.tool == 'zless':
-                        row = [size * 4, filename, target_path]
+        for key in filenames:
+            filename = filenames[key]
+            base, extension = os.path.splitext(filename)
+            while extension in ZIP_EXT:
+                base, extension = os.path.splitext(base)
+            for size, count_int in zip(self.sizes, self.counts):
+                if count_int == self.conf['Downsample']['target']: #fullrun
+                    downsampled[count_int][key] = filename
+                    continue
+                target_file = os.path.basename(base) + '_' + self.tool + '_' + humanize(count_int) + extension
+                target_path = '/'.join([bucket_dir, output_path, target_file])
+                downsampled[count_int][key] = target_path
+                if self.tool in ['picard', 'samtools', 'seqtk']:
+                    row = [size, filename, target_path]
+                elif self.tool == 'zless':
+                    row = [size * 4, filename, target_path]
+                else:
+                    sys.exit()
+                if self.index: # To index the downsampled file
+                    if type == BAM:
+                        ext = '.bai'
+                    elif type == FA or type == FQ:
+                        ext = '.fai'
                     else:
                         sys.exit()
-                    if self.index: # To index the downsampled file
-                        if type == BAM:
-                            ext = '.bai'
-                        elif type == FA or type == FQ:
-                            ext = '.fai'
-                        else:
-                            sys.exit()
-                        idx_key = key + '_IDX'
-                        index_path = target_path + ext
-                        downsampled[count_int][idx_key] = index_path
-                        row.append(index_path)
-                    tsv_writer.writerow(row)
+                    idx_key = key + '_IDX'
+                    index_path = target_path + ext
+                    downsampled[count_int][idx_key] = index_path
+                    row.append(index_path)
+                tsv_writer.writerow(row)
 
         scheduler = Scheduler('dsub', self.conf)
         if self.tool == 'picard':
@@ -163,4 +164,5 @@ class Downsample(object):
         scheduler.add_argument('--skip')
         p = scheduler.run()
         p.wait()
+        dsub_tsv.close()
         return downsampled
