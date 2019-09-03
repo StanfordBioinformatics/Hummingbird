@@ -162,6 +162,7 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             scheduler.add_argument('--boot-disk-size', '50') # google providers put the Docker container's /tmp directory on the boot disk, 10 GB by defualt
             scheduler.add_argument('--wait')
             scheduler.add_argument('--skip')
+            dsub_script.seek(0)
             proc = scheduler.run()
             procs.append(proc)
             time.sleep(1)
@@ -260,8 +261,10 @@ class BashProfiler(BaseProfiler):
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
+            scheduler.add_argument('--boot-disk-size', '50') # 10 GB by defualt
             scheduler.add_argument('--wait')
             scheduler.add_argument('--skip')
+            dsub_script.seek(0)
             proc = scheduler.run()
             procs.append(proc)
             time.sleep(1)

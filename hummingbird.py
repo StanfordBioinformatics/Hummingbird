@@ -4,61 +4,12 @@ import argparse
 import json
 import logging
 import math
-import numpy as np
-from sklearn import linear_model
-from scipy.interpolate import Rbf, UnivariateSpline
 import sys
-import matplotlib
-matplotlib.use('TkAgg')
-import matplotlib.pyplot as plt
 
 from downsample import Downsample
-from profiling import Profiler
+from profiler import Profiler
 from instance import *
 from hummingbird_utils import *
-
-def extrapolate(method, known_data, target_value):
-    """Use scipy interpolate module to extrapolate target value and plot."""
-    x = known_data.keys()
-    ys = np.array(known_data.values())
-    result = []
-    x_test = np.linspace(1000, target_value, num=100)
-    plt.figure(figsize=(18, 10))
-    for i in range(len(ys[0])):
-        y = ys[:,i]
-        if method == 'spline':
-            f = UnivariateSpline(x, y, k=1, ext='extrapolate')
-        elif method == 'rbf':
-            f = Rbf(x, y)
-        result.append(f(target_value))
-
-        plt.subplot(len(ys[0]), 1, i + 1)
-        plt.plot(x_test, f(x_test), 'b', x, y, 'ro')
-    plt.show()
-    return result
-
-def regression(known_data, target_value, filename='plot/hummingbird.png'):
-    """Use sklearn regression module to predict target value and plot."""
-    X = np.array(known_data.keys())
-    X = X.reshape((len(known_data), 1))
-    ys = np.array(known_data.values())
-    result = []
-    x_test = np.linspace(1000, target_value, num=100)
-    x_test = x_test.reshape(100, 1)
-    plt.figure(figsize=(18, 10))
-    for i in range(len(ys[0])):
-        y = ys[:,i]
-        regr = linear_model.LinearRegression()
-        regr.fit(X, y)
-        # Reshape data using array.reshape(-1, 1) if your data has a single feature
-        target = np.array(target_value).reshape(-1, 1)
-        res = max(np.max(y), np.asscalar(regr.predict(target)))
-        result.append(res)
-
-        plt.subplot(len(ys[0]), 1, i + 1)
-        plt.plot(x_test, regr.predict(x_test), 'b', X, y, 'ro')
-    plt.savefig(filename)
-    return result
 
 def main():
     """The main pipeline."""
@@ -85,6 +36,7 @@ def main():
     logging.info('Downsampling done.')
     logging.info(ds_dict)
 
+    target = config['Downsample']['target']
     for i, workflow in enumerate(config['Profiling']):
         cont = input('Continue? (y/N): ')
         if cont != 'y':
@@ -105,17 +57,17 @@ def main():
         profiling_dict = profiler.profile(ds_dict)
         logging.info('Memory profiling done.')
         logging.info(profiling_dict)
+        if not profiling_dict:
+            sys.exit('Memory profiling failed.')
 
         all_valid = set()
         all_invalid = set()
+        thread_list = workflow.get('thread', [4])
+        predictor = Predictor(target, thread_list)
         for task in profiling_dict:
             print('==', task, '==')
             pf_dict = profiling_dict[task]
-            target = config['Downsample']['target']
-            #print [np.asscalar(a) for a in extrapolate('spline', pf_dict, target)]
-            predictions = regression(pf_dict, target, 'plot/' + task + '.png')
-            thread_list = workflow.get('thread', [4])
-            #thread_list = [t.strip() for t in thread_list]
+            predictions = predictor.extrapolate(pf_dict, task)
             for i, t in enumerate(thread_list):
                 print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
                 reserved_mem = 1
@@ -153,7 +105,7 @@ def main():
         if config['Downsample'].get('fullrun', False):
             ds_size = target
         else:
-            ds_size = int(target * Downsample.runtime_size)
+            ds_size = int(target * Downsample.runtime_frac)
         runtimes_dict = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
         logging.info('Runtime profiling done.')
         logging.info(runtimes_dict)
