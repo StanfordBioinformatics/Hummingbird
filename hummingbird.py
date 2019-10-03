@@ -38,8 +38,8 @@ def main():
 
     target = config['Downsample']['target']
     for i, workflow in enumerate(config['Profiling']):
-        cont = input('Continue? (y/N): ')
-        if cont != 'y':
+        user_input = input('Do you want to continue? [y/N]: ')
+        if user_input != 'y' and user_input != 'Y':
             break
         if 'wdl_file' in workflow and 'backend_conf' in workflow:
             backend = 'cromwell'
@@ -53,7 +53,7 @@ def main():
         wf_conf['Profiling'] = config['Profiling'][i]
         wf_conf['Downsample'] = config['Downsample']
         wf_conf['Platform'] = config['Platform']
-        profiler = Profiler(backend, args.profile_tool, 'mem', wf_conf)
+        profiler = Profiler(backend, args.profile_tool, Profiler.mem_mode, wf_conf)
         profiling_dict = profiler.profile(ds_dict)
         logging.info('Memory profiling done.')
         logging.info(profiling_dict)
@@ -99,8 +99,9 @@ def main():
                 #valid += cus_types
 
         all_valid.difference_update(all_invalid)
+        logging.info(all_valid)
         logging.info('Preparing runtime profiling...')
-        profiler = Profiler(backend, args.profile_tool, 'time', wf_conf)
+        profiler = Profiler(backend, args.profile_tool, Profiler.time_mode, wf_conf)
         # TODO: target unassinged if profiling_dict is empty
         if config['Downsample'].get('fullrun', False):
             ds_size = target
@@ -112,13 +113,17 @@ def main():
         for task in runtimes_dict:
             print('==' + task + '==')
             runtimes = runtimes_dict[task][ds_size]
-            sorted_runtimes = sorted(zip(runtimes, all_valid))
-            prices = [ins.price for ins in all_valid]
+            zipped_runtimes = [(t,m) for t, m in zip(runtimes, all_valid) if t]
+            runtimes, succeeded = [], []
+            for t, m in zipped_runtimes:
+                runtimes.append(t)
+                succeeded.append(m)
+            sorted_runtimes = sorted(zipped_runtimes)
+            prices = [ins.price for ins in succeeded]
             costs = [t * p for t, p in zip(runtimes, prices)]
-            #costs = [(t * ins.price, ins) for t, ins in sorted_runtimes]
-            sorted_costs = sorted(zip(costs, all_valid))
+            sorted_costs = sorted(zip(costs, succeeded))
             efficiencies = cost_efficiency(runtimes, costs)
-            sorted_efficiencies = sorted(zip(efficiencies, all_valid), reverse=True)
+            sorted_efficiencies = sorted(zip(efficiencies, succeeded), reverse=True)
             print('The fastest machine type: {}'.format(sorted_runtimes[0][1].name))
             print('The cheapest machine type: {}'.format(sorted_costs[0][1].name))
             print('The most cost-efficient machine type: {}'.format(sorted_efficiencies[0][1].name))

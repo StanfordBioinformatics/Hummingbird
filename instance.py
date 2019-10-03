@@ -56,7 +56,7 @@ class Instance:
         return hash((self.name, self.cpu, self.mem))
 
     def __repr__(self):
-        return '<{}-cpu, {}G mem>'.format(self.cpu, self.mem)
+        return self.name
 
     def get_core(self):
         return str(self.cpu)

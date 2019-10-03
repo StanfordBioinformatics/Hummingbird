@@ -19,9 +19,9 @@ class Downsample(object):
         fullrun: Wheather bypass downsampling and run the whole input.
         index: Wheather to index the inputs.
     """
-    runtime_frac = 0.01
+    runtime_frac = 0.1
     default_instance = 'n1-highmem-8'
-    default_disksize = '500'
+    default_disk_size = '500'
     default_sam_tool = 'samtools'
     default_fa_tool = 'seqtk'
 
@@ -165,12 +165,15 @@ class Downsample(object):
         scheduler.add_argument('--tasks', dsub_tsv.name)
         scheduler.add_argument('--logging', log_path)
         scheduler.add_argument('--machine-type', Downsample.default_instance)
-        scheduler.add_argument('--disk-size', Downsample.default_disksize)
+        scheduler.add_argument('--disk-size', Downsample.default_disk_size)
         # scheduler.add_argument('--boot-disk-size', '50')
         scheduler.add_argument('--wait')
-        scheduler.add_argument('--skip')
+        if not self.conf[DOWNSAMPLE].get('force', False):
+            scheduler.add_argument('--skip')
         dsub_tsv.seek(0)
-        p = scheduler.run()
-        p.wait()
-        dsub_tsv.close()
+        try:
+            p = scheduler.run()
+            p.wait()
+        finally:
+            dsub_tsv.close()
         return downsampled
