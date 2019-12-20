@@ -1,19 +1,21 @@
-import os
+import copy
 import csv
-import time
-import tempfile
+import os
 import shutil
+import tempfile
+import time
 from collections import defaultdict
 from google.cloud import storage
-from instance import *
-from scheduler import Scheduler
-from hummingbird_utils import *
+from multiprocessing import Pool
 try:
     from urllib import unquote # python2
 except ImportError:
     from urllib.parse import unquote # python3
 
-PROFILING = 'Profiling'
+from instance import *
+from scheduler import Scheduler
+from hummingbird_utils import *
+
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
 DEFAULT_THREAD = 8
 
@@ -27,19 +29,23 @@ class Profiler(object):
         client: Cloud storage client instance.
     """
     default_boot_disk_size = '50'
-    default_disk_size = '1000'
+    default_disk_size = '500'
     mem_mode = 'mem'
     time_mode = 'time'
 
     def __init__(self, backend, tool, mode, conf):
-        if backend == 'cromwell':
-            self.profiler = CromwellProfiler(mode, conf)
-        else:
-            self.profiler = BashProfiler(mode, conf)
+        self.backend = backend
         self.tool = tool
         self.mode = mode
         self.conf = conf
-        self.client = storage.Client(project=conf['Platform']['project'])
+        self.client = storage.Client(project=conf[PLATFORM]['project'])
+        self.output_dict = None
+
+    def _set_profiler(self, conf):
+        if self.backend == 'cromwell':
+            self.profiler = CromwellProfiler(self.mode, conf)
+        else:
+            self.profiler = BashProfiler(self.mode, conf)
 
     def profile(self, input_dict, machines=None):
         """Perform profiling on given input and collect result from cloud
@@ -59,35 +65,52 @@ class Profiler(object):
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
                 #thread = thread.strip()
-                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + str(thread), thread, None))
-        if self.tool == 'time':
-            result_dict = self.profiler.profile(input_dict, machines)
+                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + str(thread)))
+        tries = self.conf[PROFILING].get('tries', 1)
+        if tries > 1:
+            # Apply parallel processing
+            pool = Pool(tries)
+            results = []
+            for i in range(tries):
+                new_conf = copy.deepcopy(self.conf)
+                new_conf[PROFILING]['result'] += '/try' + str(i + 1)
+                self._set_profiler(new_conf)
+                results.append(pool.apply_async(self.profiler, (input_dict, machines)))
+            try:
+                result_dicts = [r.get() for r in results] # Collecting results
+            except:
+                pool.terminate()
+                pool.join()
+        else:
+            self._set_profiler(self.conf)
+            result_dicts = [self.profiler.profile(input_dict, machines)]
+        if self.mode == Profiler.mem_mode:
+            self.output_dict = self.profiler.output_dict
 
-        bucket = self.client.get_bucket(self.conf['Platform']['bucket'])
+        bucket = self.client.get_bucket(self.conf[PLATFORM]['bucket'])
         profiling_dict = dict()
-        empty_list = []
-        for entry_count in result_dict:
-            dir_list = result_dict[entry_count]
-            for i, dir_prefix in enumerate(dir_list):
-                blobs = list(bucket.list_blobs(prefix=dir_prefix))
-                if not blobs:
-                    empty_list.append((entry_count, i))
-                for blob in blobs:
-                    res_set = float(blob.download_as_string())
-                    basename = os.path.basename(unquote(blob.path))
-                    taskname, _ = os.path.splitext(basename)
-                    if taskname not in profiling_dict:
-                        profiling_dict[taskname] = defaultdict(list)
-                    profiling_dict[taskname][entry_count].append(res_set)
-        for taskname in profiling_dict:
-            for entry_count, i in empty_list:
-                profiling_dict[taskname][entry_count].insert(i, None)
+        for result_dict in result_dicts:
+            print(result_dict)
+            for entry_count in result_dict:
+                dir_list = result_dict[entry_count]
+                for i, dir_prefix in enumerate(dir_list):
+                    blobs = list(bucket.list_blobs(prefix=dir_prefix))
+                    print(blobs)
+                    for blob in blobs: # blobs are named as task.txt
+                        res_set = float(blob.download_as_string())
+                        basename = os.path.basename(unquote(blob.path))
+                        taskname, _ = os.path.splitext(basename)
+                        if taskname not in profiling_dict:
+                            profiling_dict[taskname] = defaultdict(lambda :[0] * len(dir_list))
+                        profiling_dict[taskname][entry_count][i] += res_set / tries
+                        print(taskname, entry_count, res_set)
         return profiling_dict
 
 class BaseProfiler(object):
     def __init__(self, mode, conf):
         self.mode = mode
         self.conf = conf
+        self.output_dict = None
 
 class CromwellProfiler(BaseProfiler):
     def profile(self, input_dict, machines):
@@ -103,21 +126,24 @@ echo '{"final_workflow_outputs_dir": "/mnt/data/final_outputs"}' > options.json
             CMD += '''unzip ${IMPORT_ZIP}'''
         CMD += '''
 java -Dconfig.file=${BACKEND_CONF} -jar cromwell-34.jar run ${WDL_FILE} --inputs ${INPUT_JSON} -m meta.json -o options.json
-mkdir /mnt/data/call_logs
+mkdir /mnt/data/mem_logs
+mkdir /mnt/data/time_logs
 for path in $(grep -Po '(?<="callRoot": ").*(?=")' meta.json)
 do
 call=$(grep -Po '(?<=\/call-)[^\/]*' <<< $path)
-grep -Po '%s' $path/execution/stderr.background > /mnt/data/call_logs/$call.txt
+grep -Po '^(\d*\.)?\d+' $path/execution/stderr.background > /mnt/data/mem_logs/$call.txt
+grep -Po '(\d*\.)?\d+$' $path/execution/stderr.background > /mnt/data/time_logs/$call.txt
 done
-cp -r -T /mnt/data/call_logs ${RESULT_DIR}
+cp -r -T /mnt/data/mem_logs ${MEM_RESULT}
+cp -r -T /mnt/data/time_logs ${TIME_RESULT}
 find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
 '''
-        if self.mode == Profiler.mem_mode:
-            CMD = CMD % '^(\d*\.)?\d+'
-        else:
-            CMD = CMD % '(\d*\.)?\d+$'
+        # if self.mode == Profiler.mem_mode:
+        #     CMD = CMD % '^(\d*\.)?\d+'
+        # else:
+        #     CMD = CMD % '(\d*\.)?\d+$'
         dsub_script.write(CMD)
-        bucket_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
+        bucket_base = 'gs://' + self.conf[PLATFORM]['bucket'] + '/'
         backend_conf = bucket_base + self.conf[PROFILING]['backend_conf']
         wdl_file = bucket_base + self.conf[PROFILING]['wdl_file']
         log_path = bucket_base + self.conf[PROFILING]['logging']
@@ -134,7 +160,8 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
                 headline = ['--input BACKEND_CONF',
                             '--input WDL_FILE',
                             '--input INPUT_JSON',
-                            '--output-recursive RESULT_DIR',
+                            '--output-recursive MEM_RESULT',
+                            '--output-recursive TIME_RESULT',
                             '--output-recursive OUTPUT_DIR']
                 if 'imports' in self.conf[PROFILING]:
                     headline += ['--input IMPORT_ZIP']
@@ -142,16 +169,19 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
                 else:
                     import_zip = None
                 tsv_writer.writerow(headline)
-                for entry_count, json_input in zip(self.conf['Downsample']['count'], json_inputs):
+                for entry_count, json_input in zip(self.conf[DOWNSAMPLE]['count'], json_inputs):
                     # Enforce the entry_count has the same order as json inputs
-                    if entry_count not in input_dict:
-                        continue
+                    # if entry_count not in input_dict:
+                    #     continue
                     json_input = bucket_base + json_input
-                    result_prefix = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + self.mode + '/'
-                    result_dict[entry_count].append(result_prefix)
-                    result_dir = bucket_base + result_prefix
+                    mem_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                    time_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                    result_path = mem_path if self.mode == Profiler.mem_mode else time_path
+                    result_dict[entry_count].append(result_path)
+                    mem_result = bucket_base + mem_path
+                    time_result = bucket_base + time_path
                     output_dir = bucket_base + self.conf[PROFILING]['output'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/'
-                    row = [backend_conf, wdl_file, json_input, result_dir, output_dir]
+                    row = [backend_conf, wdl_file, json_input, mem_result, time_result, output_dir]
                     if import_zip:
                         row += [import_zip]
                     tsv_writer.writerow(row)
@@ -160,7 +190,7 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
             scheduler.add_argument('--boot-disk-size', Profiler.default_boot_disk_size) # google providers put the Docker container's /tmp directory on the boot disk, 10 GB by defualt
-            scheduler.add_argument('--disk-size', Profiler.default_disk_size)
+            scheduler.add_argument('--disk-size', self.conf[PROFILING].get('disk', Profiler.default_disk_size))
             scheduler.add_argument('--wait')
             if not self.conf[PROFILING].get('force', False):
                 scheduler.add_argument('--skip')
@@ -178,6 +208,10 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
         return result_dict
 
 class BashProfiler(BaseProfiler):
+    # A hook to allow pickling object for multiprocessing
+    def __call__(self, input_dict, machines):
+        return self.profile(input_dict, machines)
+
     def profile(self, input_dict, machines):
         """Perform profiling on given input.
 
@@ -189,14 +223,21 @@ class BashProfiler(BaseProfiler):
             A dict mapping the number of downsampled size to a list of
                 paths of the results of memory/time usage profiling.
         """
-        url_base = 'gs://' + self.conf['Platform']['bucket'] + '/'
+        url_base = 'gs://' + self.conf[PLATFORM]['bucket'] + '/'
         log_path = url_base + self.conf[PROFILING]['logging']
         dsub_script = tempfile.NamedTemporaryFile()
         result_dict = defaultdict(list)
+        output_dict = defaultdict(dict)
+        prev_mem = 0 # used to get output from the largest instances
 
         # Prepare profiling script
-        dsub_script.write('apt-get -qq update\n')
-        dsub_script.write('apt-get -qq install time\n')
+        # dsub_script.write('echo "deb [check-valid-until=no] http://cdn-fastly.deb.debian.org/debian jessie main" > /etc/apt/sources.list.d/jessie.list\n')
+        # dsub_script.write('echo "deb [check-valid-until=no] http://archive.debian.org/debian jessie-backports main" > /etc/apt/sources.list.d/jessie-backports.list\n')
+        # dsub_script.write('sed -i "/deb http:\/\/deb.debian.org\/debian jessie-updates main/d" /etc/apt/sources.list\n')
+        # dsub_script.write('apt-get -o Acquire::Check-Valid-Until=false update\n')
+        # dsub_script.write('apt-get -qq install time\n')
+        dsub_script.write('apt-get -qq update && apt-get -qq install time\n')
+        dsub_script.write('df --output=used /mnt/data | tail -1\n')
         if self.conf[PROFILING].get('script'):
             with open(self.conf[PROFILING]['script'], 'r') as ori:
                 for line in ori:
@@ -204,6 +245,7 @@ class BashProfiler(BaseProfiler):
         else:
             for line in self.conf[PROFILING]['command'].splitlines():
                 dsub_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + line + '\n')
+        dsub_script.write('df --output=used /mnt/data | tail -1\n')
         dsub_script.write("awk '{print $1}' result.txt > ${RUNTIME_RESULT}\n")
         dsub_script.write("awk '{print $2}' result.txt > ${RSS_RESULT}\n")
 
@@ -253,22 +295,24 @@ class BashProfiler(BaseProfiler):
                             else:
                                 row.append(url_base + path)
                     if 'output' in self.conf[PROFILING]:
-                        for path in self.conf[PROFILING]['output'].values():
-                            extension = ""
+                        for key in self.conf[PROFILING]['output'].keys():
+                            path = self.conf[PROFILING]['output'][key]
                             basename, ext = os.path.splitext(path)
-                            while ext:
-                                extension = ext + extension
+                            while ext in ZIP_EXT:
                                 basename, ext = os.path.splitext(basename)
-                            path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + extension
+                            path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
                             row.append(url_base + path)
+                            if machine.mem > prev_mem:
+                                output_dict[entry_count][key] = url_base + path
                     tsv_writer.writerow(row)
+                prev_mem = machine.mem
 
             scheduler.add_argument('--image', self.conf[PROFILING]['image'])
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
             scheduler.add_argument('--boot-disk-size', Profiler.default_boot_disk_size) # 10 GB by defualt
-            scheduler.add_argument('--disk-size', Profiler.default_disk_size)
+            scheduler.add_argument('--disk-size', self.conf[PROFILING].get('disk', Profiler.default_disk_size))
             scheduler.add_argument('--wait')
             if not self.conf[PROFILING].get('force', False):
                 scheduler.add_argument('--skip')
@@ -280,7 +324,10 @@ class BashProfiler(BaseProfiler):
         try:
             for proc in procs:
                 proc.wait()
+        except:
+            sys.exit("Exit. Unfinished dsub jobs will still be runing.")
         finally:
             dsub_script.close()
             shutil.rmtree(temp)
+        self.output_dict = output_dict
         return result_dict

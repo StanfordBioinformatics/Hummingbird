@@ -28,9 +28,9 @@
     },
     {
       "image": "broadinstitute/gatk:4.1.2.0",
-      "logging": "logging/mutect2/whole",
+      "logging": "logging/mutect2/gatk-best-practices",
       "thread": [8],
-      "result": "result/mutect2/whole",
+      "result": "result/mutect2/gatk-best-practices",
       "wdl_file": "input/mutect2/mutect2.wdl",
       "backend_conf": "input/gfs-backend.conf",
       "json_input": [
@@ -40,7 +40,7 @@
           "input/mutect2/mutect2.exome.inputs.sample.7519211.json"
         ]
       ],
-      "output": "output/mutect2/whole"
+      "output": "output/mutect2/gatk-best-practices"
     }
   ]
 }

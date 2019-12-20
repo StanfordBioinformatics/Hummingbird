@@ -1,0 +1,81 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_R1": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz",
+      "INPUT_R2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
+    },
+    "target": 707646124,
+    "fractions": [0.001, 0.01, 0.1],
+    "output": "downsampled/platinum-genomes/fastq",
+    "logging": "logging/platinum-genomes/fastq",
+    "fullrun": false
+  },
+  "Profiling": [
+    {
+      "image": "xingziye/bwa-gatk",
+      "logging": "logging/bwa",
+      "result": "result/bwa",
+      "thread": [32],
+      "input-recursive": {
+        "REF": "references/hg19"
+      },
+      "command": "bwa mem -t ${THREAD} -M -R '@RG\\tID:0\\tLB:Library\\tPL:Illumina\\tSM:NA12890' ${REF}/ucsc.hg19.fasta ${INPUT_R1} ${INPUT_R2} > ${ALIGNED_SAM}",
+      "output": {
+        "ALIGNED_SAM": "output/bwa/aligned_hg19.sam"
+      },
+      "force": false,
+      "disk": "1000",
+      "tries": 1
+    },
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/picard/sortsam",
+      "result": "result/picard/sortsam",
+      "thread": [4],
+      "command": "gatk --java-options \"-Xms6g -Xmx16g\" SortSam -I ${ALIGNED_SAM} -O ${SORTED_BAM} --SORT_ORDER coordinate --TMP_DIR $TMPDIR",
+      "output": {
+        "SORTED_BAM": "output/picard/sorted_hg19.bam"
+      },
+      "force": false,
+      "disk": "1000",
+      "tries": 1
+    },
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/picard/markdup",
+      "result": "result/picard/markdup",
+      "thread": [4],
+      "command": "gatk --java-options \"-Xms6g -Xmx8g\" MarkDuplicates -I ${SORTED_BAM} -M ${METRICS_FILE} -O ${DEDUP_BAM} --VALIDATION_STRINGENCY SILENT --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 --TMP_DIR $TMPDIR",
+      "output": {
+        "METRICS_FILE": "output/picard/metrics.txt",
+        "DEDUP_BAM": "output/picard/dedup_hg19.bam"
+      },
+      "force": false,
+      "disk": "500",
+      "tries": 1
+    },
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/bqsr/BaseRecalibrator",
+      "result": "result/bqsr/BaseRecalibrator",
+      "thread": [2, 4],
+      "input-recursive": {
+        "REFERENCE": "references/hg19",
+        "RESOURCE": "input/bqsr"
+      },
+      "command": "samtools index ${DEDUP_BAM}; gatk --java-options \"-Xms6g -Xmx8g\" BaseRecalibrator -I ${DEDUP_BAM} -R ${REFERENCE}/ucsc.hg19.fasta --known-sites ${RESOURCE}/dbsnp_138.hg19.vcf --known-sites ${RESOURCE}/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf -L ${RESOURCE}/GRCh37_hg19_RefSeq_refGenes.bed -O ${RECAL}",
+      "output": {
+        "RECAL": "output/bqsr/BaseRecalibrator/recal_data.table"
+      },
+      "force": false,
+      "disk": "500",
+      "tries": 3
+    }
+  ]
+}

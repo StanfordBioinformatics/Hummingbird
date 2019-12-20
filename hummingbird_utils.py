@@ -17,6 +17,10 @@ FQ = 'fq'
 SAM = 'sam'
 BAM = 'bam'
 
+PLATFORM = 'Platform'
+DOWNSAMPLE = 'Downsample'
+PROFILING = 'Profiling'
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -44,6 +48,17 @@ def cost_efficiency(run_times, costs):
     """Compute the cost efficiency as the metrics of instance."""
     speedups = np.reciprocal(run_times)
     return speedups / costs
+
+def speedup_efficiency(zipped_runtimes):
+    zipped_runtimes.sort(key=lambda t:(t[1].cpu, t[0]))
+    print(zipped_runtimes)
+    base_time = zipped_runtimes[0][0]
+    base_core = zipped_runtimes[0][1].cpu
+    for t, m in zipped_runtimes:
+        ideal = float(m.cpu) / base_core
+        speedup = base_time / t
+        efficiency = speedup / ideal
+        print(speedup, ideal, efficiency)
 
 def spline(method, known_data, target_value):
     """Use scipy interpolate module to extrapolate target value and plot."""
@@ -100,10 +115,12 @@ class Predictor(object):
     def extrapolate(self, known_data, task):
         x = np.array(known_data.keys())
         ys = np.array(known_data.values()).transpose()
-        x = x.reshape((len(known_data), 1))
+        x = x.reshape(-1, 1)
+        x = np.log(x)
         predictions = []
         x_test = np.linspace(1000, self.target, num=100)
-        x_test = x_test.reshape(100, 1)
+        x_test = x_test.reshape(-1, 1)
+        x_test = np.log(x_test)
         plt.figure(figsize=(18, 10))
         for i, y in enumerate(ys):
             thread = self.threads[i]
@@ -111,6 +128,7 @@ class Predictor(object):
             regr.fit(x, y)
             # Reshape data using array.reshape(-1, 1) if your data has a single feature
             target = np.array(self.target).reshape(-1, 1)
+            target = np.log(target)
             pred = max(np.max(y), np.asscalar(regr.predict(target)))
             predictions.append(pred)
             plt.subplot(len(ys), 1, i + 1)

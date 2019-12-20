@@ -6,8 +6,6 @@ from collections import defaultdict
 from scheduler import Scheduler
 from hummingbird_utils import *
 
-DOWNSAMPLE = 'Downsample'
-
 class Downsample(object):
     """Generate subsamples for input data.
 
@@ -19,7 +17,7 @@ class Downsample(object):
         fullrun: Wheather bypass downsampling and run the whole input.
         index: Wheather to index the inputs.
     """
-    runtime_frac = 0.1
+    runtime_frac = 0.001
     default_instance = 'n1-highmem-8'
     default_disk_size = '500'
     default_sam_tool = 'samtools'

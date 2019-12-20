@@ -1,5 +1,6 @@
 from __future__ import division, print_function
 from builtins import input
+from pprint import pformat
 import argparse
 import json
 import logging
@@ -14,7 +15,7 @@ from hummingbird_utils import *
 def main():
     """The main pipeline."""
     parser = argparse.ArgumentParser()
-    parser.add_argument('conf', help='Hummingbird configuration')
+    parser.add_argument('conf', help='Hummingbird JSON configuration')
     parser.add_argument('--fa_downsample', dest='downsample_tool',
                         choices=['seqtk', 'zless'],
                         default='seqtk',
@@ -27,20 +28,19 @@ def main():
 
     with open(args.conf, 'r') as config_file:
         config = json.load(config_file)
-        config['Downsample']['tool'] = args.downsample_tool
+        config[DOWNSAMPLE]['tool'] = args.downsample_tool
 
     logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.INFO)
     logging.info('Preparing downsampling...')
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
     logging.info('Downsampling done.')
-    logging.info(ds_dict)
 
-    target = config['Downsample']['target']
-    for i, workflow in enumerate(config['Profiling']):
-        user_input = input('Do you want to continue? [y/N]: ')
-        if user_input != 'y' and user_input != 'Y':
-            break
+    target = config[DOWNSAMPLE]['target']
+    for i, workflow in enumerate(config[PROFILING]):
+        # user_input = input('Do you want to continue? [y/N]: ')
+        # if user_input != 'y' and user_input != 'Y':
+        #     break
         if 'wdl_file' in workflow and 'backend_conf' in workflow:
             backend = 'cromwell'
         elif 'command' in workflow or 'script' in workflow:
@@ -49,16 +49,15 @@ def main():
             sys.exit('Invalid conf parameters.')
 
         logging.info('Preparing memory profiling...')
+        logging.info(pformat(ds_dict))
         wf_conf = {}
-        wf_conf['Profiling'] = config['Profiling'][i]
-        wf_conf['Downsample'] = config['Downsample']
-        wf_conf['Platform'] = config['Platform']
+        wf_conf[PROFILING] = workflow
+        wf_conf[DOWNSAMPLE] = config[DOWNSAMPLE]
+        wf_conf[PLATFORM] = config[PLATFORM]
         profiler = Profiler(backend, args.profile_tool, Profiler.mem_mode, wf_conf)
         profiling_dict = profiler.profile(ds_dict)
         logging.info('Memory profiling done.')
         logging.info(profiling_dict)
-        if not profiling_dict:
-            sys.exit('Memory profiling failed.')
 
         all_valid = set()
         all_invalid = set()
@@ -70,7 +69,7 @@ def main():
             predictions = predictor.extrapolate(pf_dict, task)
             for i, t in enumerate(thread_list):
                 print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
-                reserved_mem = 1
+                reserved_mem = 4
             min_mem = [pred/1000/1000 + reserved_mem for pred in predictions]
             valid, invalid = Instance.get_machine_types(wf_conf, min_mem)
             all_valid.update(valid)
@@ -86,47 +85,64 @@ def main():
                 print('Machine types might not have enouph memory and will be pruned:')
                 for ins in invalid:
                     print(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
-            print('Try customized machine type if necessary:')
-            cus_types = []
-            for i, t in enumerate(thread_list):
-                print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
-                cus_types.append(GCP_Instance('custom'+'-'+str(t), t, math.ceil(min_mem[i])))
-            # cus = input('Do you want to include customized machine types? (Y/N): ')
-            # if cus.lower() == 'y' or cus.lower() == 'yes':
-            #     for ins in cus_types:
-            #         price = input('Hourly price for {} core and {}GB memory:'.format(ins.cpu, ins.mem))
-            #         ins.set_price(price)
-                #valid += cus_types
-
         all_valid.difference_update(all_invalid)
+        cus = input('Do you want to include customized machine types? [y/N]: ')
+        #cus = 'no'
+        if cus.lower() == 'y' or cus.lower() == 'yes':
+            cus_types = []
+            # for i, t in enumerate(thread_list):
+                # print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
+                # cus_types.append(GCP_Instance(cpu=t, mem=math.ceil(min_mem[i])))
+            while True:
+                ins_name = input('instance types:')
+                if ins_name:
+                    cus_types.append(GCP_Instance(name=ins_name))
+                else:
+                    break
+            for ins in cus_types:
+                ins.set_price()
+            all_valid.update(cus_types)
+
         logging.info(all_valid)
+        # if len(all_valid) <= 1:
+        #     continue
         logging.info('Preparing runtime profiling...')
-        profiler = Profiler(backend, args.profile_tool, Profiler.time_mode, wf_conf)
-        # TODO: target unassinged if profiling_dict is empty
-        if config['Downsample'].get('fullrun', False):
+        profiler.mode = Profiler.time_mode
+
+        multiplier = 1
+        if wf_conf[DOWNSAMPLE].get('fullrun', False):
             ds_size = target
         else:
-            ds_size = int(target * Downsample.runtime_frac)
-        runtimes_dict = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
-        logging.info('Runtime profiling done.')
-        logging.info(runtimes_dict)
-        for task in runtimes_dict:
-            print('==' + task + '==')
-            runtimes = runtimes_dict[task][ds_size]
-            zipped_runtimes = [(t,m) for t, m in zip(runtimes, all_valid) if t]
-            runtimes, succeeded = [], []
-            for t, m in zipped_runtimes:
-                runtimes.append(t)
-                succeeded.append(m)
-            sorted_runtimes = sorted(zipped_runtimes)
-            prices = [ins.price for ins in succeeded]
-            costs = [t * p for t, p in zip(runtimes, prices)]
-            sorted_costs = sorted(zip(costs, succeeded))
-            efficiencies = cost_efficiency(runtimes, costs)
-            sorted_efficiencies = sorted(zip(efficiencies, succeeded), reverse=True)
-            print('The fastest machine type: {}'.format(sorted_runtimes[0][1].name))
-            print('The cheapest machine type: {}'.format(sorted_costs[0][1].name))
-            print('The most cost-efficient machine type: {}'.format(sorted_efficiencies[0][1].name))
+            ds_size = int(target * Downsample.runtime_frac * multiplier)
+        while True:
+            logging.info('Current downsample size: %s', str(ds_size))
+            runtimes_dict = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
+            logging.info('Runtime profiling done.')
+            logging.info(pformat(runtimes_dict))
+            for task in runtimes_dict:
+                print('==' + task + '==')
+                runtimes = runtimes_dict[task][ds_size]
+                zipped_runtimes = [(t,m) for t, m in zip(runtimes, all_valid) if t]
+                runtimes, succeeded = [], []
+                for t, m in zipped_runtimes:
+                    runtimes.append(t)
+                    succeeded.append(m)
+                speedups = speedup_efficiency(zipped_runtimes)
+                sorted_runtimes = sorted(zipped_runtimes)
+                prices = [ins.price for ins in succeeded]
+                costs = [t * p for t, p in zip(runtimes, prices)]
+                sorted_costs = sorted(zip(costs, succeeded))
+                efficiencies = cost_efficiency(runtimes, costs)
+                sorted_efficiencies = sorted(zip(efficiencies, succeeded), reverse=True)
+                print('The fastest machine type: {}'.format(bcolors.OKGREEN + sorted_runtimes[0][1].name + bcolors.ENDC))
+                print('The cheapest machine type: {}'.format(bcolors.OKGREEN + sorted_costs[0][1].name + bcolors.ENDC))
+                print('The most cost-efficient machine type: {}'.format(bcolors.OKGREEN + sorted_efficiencies[0][1].name + bcolors.ENDC))
+            if ds_size >= int(target * 0.1) or input("continue?") == 'n':
+                if profiler.output_dict is not None: # CromwellProfiler returns None output_dict
+                    ds_dict = profiler.output_dict # update downsampled input as output from previous workflow
+                break
+            multiplier *= 10
+            ds_size = int(target * Downsample.runtime_frac * multiplier)
 
 if __name__ == "__main__":
     main()

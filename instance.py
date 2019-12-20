@@ -77,17 +77,18 @@ class GCP_Instance(Instance):
         cur.executemany("INSERT INTO instance VALUES (?,?,?,?,?)", machine_types)
         conn.commit()
         SQL = '''SELECT DISTINCT NAME, CPUS, MEMORY_GB FROM instance
-WHERE ZONE LIKE ?
+WHERE NAME LIKE ?
+AND ZONE LIKE ?
 AND MEMORY_GB >= ?
 AND CPUS = ? '''
         for cpu, mem in zip(cpu_list, min_mem):
-            cur.execute(SQL, [region + '%', mem, cpu])
+            cur.execute(SQL, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
                 valid.append(GCP_Instance(entry[0], entry[1], entry[2]))
         SQL = SQL.replace('>=', '<')
         for cpu, mem in zip(cpu_list, min_mem):
-            cur.execute(SQL, [region + '%', mem, cpu])
+            cur.execute(SQL, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
                 invalid.append(GCP_Instance(entry[0], entry[1], entry[2]))
@@ -102,5 +103,19 @@ AND CPUS = ? '''
         else:
             raise Exception('Fail to set price.')
 
-    def __init__(self, name, cpu, mem):
-        Instance.__init__(self, name, cpu, mem)
+    def __init__(self, name=None, cpu=None, mem=None):
+        if name is None and (cpu is None or mem is None):
+            Instance.__init__(self, 'n1-standard-1', 1, 3.75)
+        elif name:
+            _, family, vcpu = name.split('-')
+            if family == 'standard':
+                multiplier = 3.75
+            elif family == 'highmem':
+                multiplier = 7.5
+            elif family == 'highcpu':
+                multiplier = 0.9
+            else:
+                raise Exception('Unsupported instance family')
+            Instance.__init__(self, name, vcpu, int(vcpu) * multiplier)
+        else:
+            Instance.__init__(self, 'custom', cpu, mem)

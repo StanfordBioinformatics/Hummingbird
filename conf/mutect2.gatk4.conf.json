@@ -18,7 +18,7 @@
   },
   "Profiling": [
     {
-      "image": "broadinstitute/gatk3:3.8-1",
+      "image": "broadinstitute/gatk",
       "logging": "logging/mutect2/command-line",
       "thread": [8, 16, 32],
       "input": {
@@ -26,7 +26,7 @@
         "REF_FAI": "gs://gatk-best-practices/somatic-b37/Homo_sapiens_assembly19.fasta.fai",
         "REF_DICT": "gs://gatk-best-practices/somatic-b37/Homo_sapiens_assembly19.dict"
       },
-      "command": "java -jar /usr/GenomeAnalysisTK.jar -T MuTect2 -R ${REF} -I:tumor ${TUMOR_BAM} -I:normal ${NORMAL_BAM} -o ${OUTPUT_VCF} -nct ${THREAD}",
+      "command": "gatk Mutect2 -R ${REF} -I:tumor ${TUMOR_BAM} -I:normal ${NORMAL_BAM} -O ${OUTPUT_VCF}",
       "result": "result/mutect2/command-line",
       "output": {
         "OUTPUT_VCF": "output/mutect2/command-line/output.vcf"

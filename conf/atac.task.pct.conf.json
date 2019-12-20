@@ -1,0 +1,242 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_FILE1": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R1.fastq.gz",
+      "INPUT_FILE2": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R2.fastq.gz"
+    },
+    "target": 308272658,
+    "output": "downsampled/ENCODE/ENCSR356KRQ",
+    "logging": "logging/ENCODE/ENCSR356KRQ"
+  },
+  "Profiling": [
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/trim_adapter",
+      "thread": [8, 16, 32],
+      "result": "result/atac-seq-pipeline/trim_adapter",
+      "wdl_file": "input/atac-seq-pipeline/trim_adapter/test_trim_adapter.wdl",
+      "backend_conf": "input/backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_308272_8.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_3082726_8.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_30827265_8.json"
+        ],
+        [
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_308272_16.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_3082726_16.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_30827265_16.json"
+        ],
+        [
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_308272_32.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_3082726_32.json",
+          "input/atac-seq-pipeline/trim_adapter/test_trim_adapter_downsampled_30827265_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/trim_adapter"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/bowtie2",
+      "thread": [8, 16, 32],
+      "result": "result/atac-seq-pipeline/bowtie2",
+      "wdl_file": "input/atac-seq-pipeline/bowtie2/test_bowtie2.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_308272_8.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_3082726_8.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_30827265_8.json"
+        ],
+        [
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_308272_16.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_3082726_16.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_30827265_16.json"
+        ],
+        [
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_308272_32.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_3082726_32.json",
+          "input/atac-seq-pipeline/bowtie2/test_bowtie2_downsampled_30827265_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/bowtie2"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/filter",
+      "thread": [8, 16, 32],
+      "result": "result/atac-seq-pipeline/filter",
+      "wdl_file": "input/atac-seq-pipeline/filter/test_filter.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_308272_8.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_3082726_8.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_30827265_8.json"
+        ],
+        [
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_308272_16.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_3082726_16.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_30827265_16.json"
+        ],
+        [
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_308272_32.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_3082726_32.json",
+          "input/atac-seq-pipeline/filter/test_filter_downsampled_30827265_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/filter"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/bam2ta",
+      "thread": [8, 16, 32],
+      "result": "result/atac-seq-pipeline/bam2ta",
+      "wdl_file": "input/atac-seq-pipeline/bam2ta/test_bam2ta.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_308272_8.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_3082726_8.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_30827265_8.json"
+        ],
+        [
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_308272_16.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_3082726_16.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_30827265_16.json"
+        ],
+        [
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_308272_32.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_3082726_32.json",
+          "input/atac-seq-pipeline/bam2ta/test_bam2ta_downsampled_30827265_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/bam2ta"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/xcor",
+      "thread": [8, 16, 32],
+      "result": "result/atac-seq-pipeline/xcor",
+      "wdl_file": "input/atac-seq-pipeline/xcor/test_xcor.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_308272_8.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_3082726_8.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_30827265_8.json"
+        ],
+        [
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_308272_16.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_3082726_16.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_30827265_16.json"
+        ],
+        [
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_308272_32.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_3082726_32.json",
+          "input/atac-seq-pipeline/xcor/test_xcor_downsampled_30827265_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/xcor"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/macs2",
+      "thread": [4,8],
+      "result": "result/atac-seq-pipeline/macs2",
+      "wdl_file": "input/atac-seq-pipeline/macs2/test_macs2.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_308272.json",
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_3082726.json",
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_30827265.json"
+        ],
+        [
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_308272.json",
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_3082726.json",
+          "input/atac-seq-pipeline/macs2/test_macs2_downsampled_30827265.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/macs2"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/spr",
+      "thread": [4,8],
+      "result": "result/atac-seq-pipeline/spr",
+      "wdl_file": "input/atac-seq-pipeline/spr/test_spr.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_308272.json",
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_3082726.json",
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_30827265.json"
+        ],
+        [
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_308272.json",
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_3082726.json",
+          "input/atac-seq-pipeline/spr/test_spr_downsampled_30827265.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/spr"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/overlap",
+      "thread": [4,8],
+      "result": "result/atac-seq-pipeline/overlap",
+      "wdl_file": "input/atac-seq-pipeline/overlap/test_overlap.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_308272.json",
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_3082726.json",
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_30827265.json"
+        ],
+        [
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_308272.json",
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_3082726.json",
+          "input/atac-seq-pipeline/overlap/test_overlap_downsampled_30827265.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/overlap"
+    },
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline/idr",
+      "thread": [4,8],
+      "result": "result/atac-seq-pipeline/idr",
+      "wdl_file": "input/atac-seq-pipeline/idr/test_idr.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "imports": "input/atac-seq-pipeline/my_atac.wdl.zip",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_308272.json",
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_3082726.json",
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_30827265.json"
+        ],
+        [
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_308272.json",
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_3082726.json",
+          "input/atac-seq-pipeline/idr/test_idr_downsampled_30827265.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline/idr"
+    }
+  ]
+}
