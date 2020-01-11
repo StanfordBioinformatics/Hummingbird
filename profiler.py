@@ -225,7 +225,7 @@ class BashProfiler(BaseProfiler):
         """
         url_base = 'gs://' + self.conf[PLATFORM]['bucket'] + '/'
         log_path = url_base + self.conf[PROFILING]['logging']
-        dsub_script = tempfile.NamedTemporaryFile()
+        dsub_script = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
         result_dict = defaultdict(list)
         output_dict = defaultdict(dict)
         prev_mem = 0 # used to get output from the largest instances
@@ -281,7 +281,7 @@ class BashProfiler(BaseProfiler):
                     result_dict[entry_count].append(result_path)
                     mem_addr = url_base + mem_path + 'script.txt'
                     time_addr = url_base + time_path + 'script.txt'
-                    row = [str(machine.get_core()), time_addr, mem_addr] + input_dict[entry_count].values()
+                    row = [str(machine.get_core()), time_addr, mem_addr] + list(input_dict[entry_count].values())
                     if 'input' in self.conf[PROFILING]:
                         for path in self.conf[PROFILING]['input'].values():
                             if path.startswith("gs://"):

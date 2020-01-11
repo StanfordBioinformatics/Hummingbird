@@ -92,7 +92,7 @@ class Downsample(object):
         log_path = bucket_dir + '/' + self.conf[DOWNSAMPLE]['logging']
         downsampled = defaultdict(dict)
 
-        dsub_tsv = tempfile.NamedTemporaryFile()
+        dsub_tsv = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
         tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
         row = ['--env COUNT', '--input INPUT_FILE']
         if not self.fullrun:

@@ -113,8 +113,8 @@ class Predictor(object):
             os.makedirs(Predictor.plot_dir)
 
     def extrapolate(self, known_data, task):
-        x = np.array(known_data.keys())
-        ys = np.array(known_data.values()).transpose()
+        x = np.array(list(known_data.keys()))
+        ys = np.array(list(known_data.values())).transpose()
         x = x.reshape(-1, 1)
         x = np.log(x)
         predictions = []

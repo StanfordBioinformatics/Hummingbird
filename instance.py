@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import unicode_literals
 import subprocess
 import sqlite3
 
@@ -70,7 +71,7 @@ class GCP_Instance(Instance):
         cur = conn.cursor()
         cur.execute('''CREATE TABLE instance
                     (NAME text, ZONE text, CPUS INTEGER, MEMORY_GB real, DEPRECATED text)''')
-        machine_types = output.splitlines()
+        machine_types = output.decode("utf-8").splitlines() # decode to convert bytes array to string in python3
         machine_types = [line.split() for line in machine_types]
         # Deprecated filed is empty for returned output
         machine_types = [line + [None] for line in machine_types if len(line) == 4]
