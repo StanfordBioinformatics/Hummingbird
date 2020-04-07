@@ -116,23 +116,29 @@ class Predictor(object):
         x = np.array(list(known_data.keys()))
         ys = np.array(list(known_data.values())).transpose()
         x = x.reshape(-1, 1)
-        x = np.log(x)
+        x_log = np.log(x)
         predictions = []
         x_test = np.linspace(1000, self.target, num=100)
         x_test = x_test.reshape(-1, 1)
-        x_test = np.log(x_test)
+        x_test_log = np.log(x_test)
+        # Reshape data using array.reshape(-1, 1) if your data has a single feature
+        target = np.array(self.target).reshape(-1, 1)
+        target_log = np.log(target)
         plt.figure(figsize=(18, 10))
-        for i, y in enumerate(ys):
-            thread = self.threads[i]
+        def compute_model(x, y, target):
             regr = linear_model.LinearRegression()
             regr.fit(x, y)
-            # Reshape data using array.reshape(-1, 1) if your data has a single feature
-            target = np.array(self.target).reshape(-1, 1)
-            target = np.log(target)
+            r2 = regr.score(x, y)
             pred = max(np.max(y), np.asscalar(regr.predict(target)))
-            predictions.append(pred)
+            return (pred, r2)
+        for i, y in enumerate(ys):
+            pred, r2 = compute_model(x, y, target)
+            pred_log, r2_log = compute_model(x_log, y, target_log)
+            print(pred, pred_log)
+            print(r2, r2_log)
+            predictions.append(pred_log)
             plt.subplot(len(ys), 1, i + 1)
-            plt.plot(x_test, regr.predict(x_test), 'b', x, y, 'ro')
+            plt.plot(x_test_log, regr.predict(x_test_log), 'b', x, y, 'ro')
         filename = task + '.png'
         plt.savefig(os.path.join(Predictor.plot_dir, filename))
         return predictions
