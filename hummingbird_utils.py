@@ -104,13 +104,9 @@ def regression(known_data, target_value, filename='plot/hummingbird.png'):
     return result
 
 class Predictor(object):
-    plot_dir = 'plot'
-
     def __init__(self, target, threads):
         self.target = target
         self.threads = threads
-        if not os.path.exists(Predictor.plot_dir):
-            os.makedirs(Predictor.plot_dir)
 
     def extrapolate(self, known_data, task):
         x = np.array(list(known_data.keys()))
@@ -124,7 +120,6 @@ class Predictor(object):
         # Reshape data using array.reshape(-1, 1) if your data has a single feature
         target = np.array(self.target).reshape(-1, 1)
         target_log = np.log(target)
-        plt.figure(figsize=(18, 10))
         def compute_model(x, y, target):
             regr = linear_model.LinearRegression()
             regr.fit(x, y)
@@ -134,11 +129,7 @@ class Predictor(object):
         for i, y in enumerate(ys):
             pred, r2 = compute_model(x, y, target)
             pred_log, r2_log = compute_model(x_log, y, target_log)
-            print(pred, pred_log)
-            print(r2, r2_log)
+            print('prediction:', pred, pred_log)
+            print('R2:', r2, r2_log)
             predictions.append(pred_log)
-            plt.subplot(len(ys), 1, i + 1)
-            plt.plot(x_test_log, regr.predict(x_test_log), 'b', x, y, 'ro')
-        filename = task + '.png'
-        plt.savefig(os.path.join(Predictor.plot_dir, filename))
         return predictions
