@@ -1,4 +1,4 @@
-# Hummingbird: provide fast and cheap configurations to run genomics applications on Google cloud
+# Hummingbird: Efficient Performance Prediction for Executing Genomic Applications in the Cloud
 
 ## Overview
 
