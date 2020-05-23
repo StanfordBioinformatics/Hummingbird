@@ -3,8 +3,9 @@ import csv
 import sys
 import tempfile
 from collections import defaultdict
-from scheduler import Scheduler
+from scheduler import *
 from hummingbird_utils import *
+from instance import *
 
 class Downsample(object):
     """Generate subsamples for input data.
@@ -61,7 +62,10 @@ class Downsample(object):
 
         downsampled = {}
         for type in type_dict:
-            downsampled.update(self.downsample_by_type(type_dict[type], type))
+            if self.conf[PLATFORM]['service'] == 'gcp':
+                downsampled.update(self.downsample_by_type(type_dict[type], type))
+            elif self.conf[PLATFORM]['service'] == 'aws':
+                downsampled.update(self.downsample_by_type_aws(type_dict[type], type))
         return downsampled
 
     def downsample_by_type(self, key_file_dict, type):
@@ -175,3 +179,40 @@ class Downsample(object):
         finally:
             dsub_tsv.close()
         return downsampled
+
+    def downsample_by_type_aws(self, key_file_dict, type):
+        """Downsample using AWS Batch
+        It does not support indexing.
+        """
+        if self.fullrun:
+            return {self.conf[DOWNSAMPLE]['target']: key_file_dict}
+
+        if type == SAM or type == BAM:
+            tool = Downsample.default_sam_tool
+            sys.exit('SAM/BAM Downsample is unsupported in AWS')
+        else:
+            tool = Downsample.default_fa_tool
+
+        bucket_dir = 's3://' + self.conf[PLATFORM]['bucket']
+        output_path = self.conf[DOWNSAMPLE]['output'].strip('/')
+        downsampled = defaultdict(dict)
+
+        ds_script = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
+
+        for key in key_file_dict:
+            input_path = key_file_dict[key]
+            local_name = os.path.basename(input_path)
+            ds_script.write(' '.join(['aws', 's3', 'cp', input_path, local_name]) + '\n') # Localization
+            base, extension = os.path.splitext(input_path)
+            while extension in ZIP_EXT:
+                base, extension = os.path.splitext(base)
+            for frac, count_int in zip(self.fractions, self.counts):
+                target_file = os.path.basename(base) + '_' + tool + '_' + humanize(count_int) + extension
+                ds_script.write(' '.join(['seqtk', 'sample', local_name, str(frac), '>', target_file]) + '\n')
+                target_path = '/'.join([bucket_dir, output_path, target_file])
+                ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n') # Delocalization
+
+        ds_script.seek(0)
+        machine = AWS_Instance('r4.xlarge')
+        scheduler = BatchScheduler(self.conf, machine, 200, ds_script.name)
+        scheduler.submit_job()

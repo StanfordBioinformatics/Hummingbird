@@ -1,5 +1,6 @@
 from __future__ import print_function
 from __future__ import unicode_literals
+import json
 import subprocess
 import sqlite3
 
@@ -120,3 +121,23 @@ AND CPUS = ? '''
             Instance.__init__(self, name, vcpu, int(vcpu) * multiplier)
         else:
             Instance.__init__(self, 'custom', cpu, mem)
+
+class AWS_Instance(Instance):
+    def __init__(self, name=None, cpu=None, mem=None):
+        if name is None and (cpu is None or mem is None):
+            Instance.__init__(self, 't2.micro', 1, 1)
+        elif name:
+            vcpu, mem = AWS_Instance.desc_instance(name)
+            Instance.__init__(self, name, vcpu, mem)
+        else:
+            Instance.__init__(self, 'custom', cpu, mem)
+
+    @staticmethod
+    def desc_instance(name):
+        output = subprocess.check_output(['aws', 'ec2', 'describe-instance-types', '--instance-types', name])
+        desc = json.loads(output)['InstanceTypes'][0]
+        return desc['VCpuInfo']['DefaultVCpus'], desc['MemoryInfo']['SizeInMiB'] / 1024
+
+if __name__ == "__main__":
+    ins = AWS_Instance('t2.micro')
+    print(ins.mem)

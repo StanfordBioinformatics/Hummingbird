@@ -35,6 +35,7 @@ def main():
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
     logging.info('Downsampling done.')
+    return
 
     target = config[DOWNSAMPLE]['target']
     for i, workflow in enumerate(config[PROFILING]):
@@ -69,7 +70,7 @@ def main():
             predictions = predictor.extrapolate(pf_dict, task)
             for i, t in enumerate(thread_list):
                 print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
-                reserved_mem = 4
+                reserved_mem = 2
             min_mem = [pred/1000/1000 + reserved_mem for pred in predictions]
             valid, invalid = Instance.get_machine_types(wf_conf, min_mem)
             all_valid.update(valid)
