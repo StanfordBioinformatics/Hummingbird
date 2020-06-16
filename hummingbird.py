@@ -35,7 +35,6 @@ def main():
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
     logging.info('Downsampling done.')
-    return
 
     target = config[DOWNSAMPLE]['target']
     for i, workflow in enumerate(config[PROFILING]):

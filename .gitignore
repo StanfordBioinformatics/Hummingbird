@@ -1,4 +1,8 @@
 *.pyc
 .DS_Store
+.vscode
 venv
 dsub_libs
+plot/*.png
+plot/*.pdf
+*.pem

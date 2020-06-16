@@ -196,6 +196,7 @@ class Downsample(object):
         bucket_dir = 's3://' + self.conf[PLATFORM]['bucket']
         output_path = self.conf[DOWNSAMPLE]['output'].strip('/')
         downsampled = defaultdict(dict)
+        skip = True
 
         ds_script = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
 
@@ -211,8 +212,18 @@ class Downsample(object):
                 ds_script.write(' '.join(['seqtk', 'sample', local_name, str(frac), '>', target_file]) + '\n')
                 target_path = '/'.join([bucket_dir, output_path, target_file])
                 ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n') # Delocalization
+                downsampled[count_int][key] = target_path
+                output = subprocess.check_output(['aws', 's3', 'ls', target_path])
+                if not output:
+                    skip = False
+
+        if skip:
+            print("Downsampled files exist, skip downsampling.")
+            return downsampled
 
         ds_script.seek(0)
         machine = AWS_Instance('r4.xlarge')
         scheduler = BatchScheduler(self.conf, machine, 200, ds_script.name)
-        scheduler.submit_job()
+        jobname = scheduler.submit_job()
+        BatchScheduler.wait_jobs([jobname])
+        return downsampled

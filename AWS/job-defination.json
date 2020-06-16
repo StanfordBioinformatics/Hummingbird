@@ -1,0 +1,25 @@
+{
+    "jobDefinitionName": "hummingbird-job",
+    "type": "container",
+    "containerProperties": {
+        "image": "xingziye/bwa-gatk:fetch_and_run",
+        "vcpus": 0,
+        "memory": 0,
+        "command": [
+        ],
+        "jobRoleArn": "arn:aws:iam::834110226206:role/ecsTaskExecutionRole",
+        "volumes": [
+        ],
+        "environment": [
+        ],
+        "mountPoints": [
+        ],
+        "ulimits": [
+        ],
+        "resourceRequirements": [
+        ]
+    },
+    "retryStrategy": {
+        "attempts": 1
+    }
+}

@@ -1,25 +1,23 @@
 {
   "Platform": {
-    "service": "gcp",
-    "project": "gbsc-gcp-project-cba",
-    "regions": "us-west1",
-    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+    "service": "aws",
+    "project": "gbsc-aws-prj-mvp",
+    "regions": "us-west-2",
+    "bucket": "bwa-hummingbird"
   },
   "Downsample": {
     "input": {
-      "INPUT_R1": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz",
-      "INPUT_R2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
+      "INPUT_R1": "s3://bwa-hummingbird/fastq/ERR194159_1.fastq.gz",
+      "INPUT_R2": "s3://bwa-hummingbird/fastq/ERR194159_2.fastq.gz"
     },
     "target": 707646124,
     "fractions": [0.001, 0.01, 0.1],
-    "output": "downsampled/platinum-genomes/fastq",
-    "logging": "logging/platinum-genomes/fastq",
+    "output": "downsampled",
     "fullrun": false
   },
   "Profiling": [
     {
-      "image": "xingziye/bwa-gatk",
-      "logging": "logging/bwa",
+      "image": "xingziye/bwa-gatk:fetch_and_run",
       "result": "result/bwa",
       "thread": [8, 16, 32],
       "input-recursive": {

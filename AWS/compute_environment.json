@@ -1,0 +1,33 @@
+{
+    "computeEnvironmentName": "hummingbird-env",
+    "type": "MANAGED",
+    "state": "ENABLED",
+    "computeResources": {
+        "type": "EC2",
+        "allocationStrategy": "BEST_FIT",
+        "minvCpus": 0,
+        "maxvCpus": 256,
+        "desiredvCpus": 0,
+        "instanceTypes": [
+        ],
+        "subnets": [
+            "subnet-6a370c13",
+            "subnet-6480a52f",
+            "subnet-acefe5f6",
+            "subnet-7f31b354"
+        ],
+        "securityGroupIds": [
+            "sg-57209e1d"
+        ],
+        "ec2KeyPair": "hummingbird",
+        "instanceRole": "ecsInstanceRole",
+        "tags": {
+            "KeyName": "hummingbird"
+        },
+        "launchTemplate": {
+            "launchTemplateName": "hummingbird_disk_launch_template",
+            "version": "$Latest"
+        }
+    },
+    "serviceRole": "arn:aws:iam::834110226206:role/service-role/AWSBatchServiceRole"
+}

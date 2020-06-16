@@ -1,19 +1,22 @@
 import copy
 import csv
+import json
 import os
 import shutil
 import tempfile
 import time
+import boto3
 from collections import defaultdict
 from google.cloud import storage
 from multiprocessing import Pool
+from string import Template
 try:
     from urllib import unquote # python2
 except ImportError:
     from urllib.parse import unquote # python3
 
 from instance import *
-from scheduler import Scheduler
+from scheduler import *
 from hummingbird_utils import *
 
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
@@ -38,7 +41,11 @@ class Profiler(object):
         self.tool = tool
         self.mode = mode
         self.conf = conf
-        self.client = storage.Client(project=conf[PLATFORM]['project'])
+        self.service = conf[PLATFORM]['service']
+        if self.service == 'aws':
+            self.client = boto3.client('s3')
+        elif self.service == 'gcp':
+            self.client = storage.Client(project=conf[PLATFORM]['project'])
         self.output_dict = None
 
     def _set_profiler(self, conf):
@@ -60,6 +67,24 @@ class Profiler(object):
                 memory/time usage sizes in the same order of threads specified in
                 config file.
         """
+        if self.service == 'aws':
+            profiling_dict = dict()
+            profiling_dict['script'] = defaultdict(list)
+            result_dict = self.batch_profile(input_dict, machines)
+            bucket_name = self.conf[PLATFORM]['bucket']
+            tries = self.conf[PROFILING].get('tries', 1)
+            for entry_count in result_dict:
+                dir_list = result_dict[entry_count]
+                for dir_prefix in dir_list:
+                    total = 0.0
+                    for t in range(tries):
+                        obj = self.client.get_object(Bucket=bucket_name, Key=dir_prefix+'try'+str(t)+'.txt')
+                        value = json.loads(obj['Body'].read())
+                        print(t, value)
+                        total += value
+                    profiling_dict['script'][entry_count].append(total/tries)
+            return profiling_dict
+
         if machines is None: # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
@@ -105,6 +130,89 @@ class Profiler(object):
                         profiling_dict[taskname][entry_count][i] += res_set / tries
                         print(taskname, entry_count, res_set)
         return profiling_dict
+
+    def batch_profile(self, input_dict, machines):
+        if machines is None: # do nothing with empty list
+            machines = list()
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            for thread in thread_list:
+                #thread = thread.strip()
+                machines.append(AWS_Instance('r5' + AWS_Instance.thread_suffix[thread]))
+        tries = self.conf[PROFILING].get('tries', 1)
+
+        url_base = 's3://' + self.conf[PLATFORM]['bucket'] + '/'
+        result_dict = defaultdict(list)
+        output_dict = defaultdict(dict)
+        prev_mem = 0 # used to get output from the largest instances
+        jobs = []
+
+        for machine in machines:
+            for entry_count in input_dict:
+                job_script = tempfile.NamedTemporaryFile(mode='w')
+                job_script.write('apt-get -qq update && apt-get -qq install time\n')
+                local_name_dict = {}
+                local_name_dict['THREAD'] = machine.get_core()
+                for input_key, input_s3_path in input_dict[entry_count].items():
+                    local_name = os.path.basename(input_s3_path)
+                    job_script.write(' '.join(['aws', 's3', 'cp', input_s3_path, local_name]) + '\n')
+                    local_name_dict[input_key] = local_name
+                if 'input-recursive' in self.conf[PROFILING]:
+                    for key, path in self.conf[PROFILING]['input-recursive'].items():
+                        local_name_dict[key] = path
+                        job_script.write(' '.join(['aws', 's3', 'cp', url_base + path, path, '--recursive']) + '\n')
+                if 'output' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output'].keys():
+                        path = self.conf[PROFILING]['output'][key]
+                        local_name = os.path.basename(path)
+                        local_name_dict[key] = local_name
+                if self.conf[PROFILING].get('script'):
+                    with open(self.conf[PROFILING]['script'], 'r') as ori:
+                        for line in ori:
+                            sub_line = Template(line).safe_substitute(local_name_dict)
+                            job_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + sub_line + '\n')
+                else:
+                    for line in self.conf[PROFILING]['command'].splitlines():
+                        sub_line = Template(line).safe_substitute(local_name_dict)
+                        job_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + sub_line + '\n')
+                job_script.write("awk '{print $1}' result.txt > time_result.txt\n")
+                job_script.write("awk '{print $2}' result.txt > mem_result.txt\n")
+
+                mem_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                time_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                result_path = mem_path if self.mode == Profiler.mem_mode else time_path
+                result_dict[entry_count].append(result_path)
+                mem_addr = url_base + mem_path + 'try$AWS_BATCH_JOB_ARRAY_INDEX.txt'
+                time_addr = url_base + time_path + 'try$AWS_BATCH_JOB_ARRAY_INDEX.txt'
+                job_script.write(' '.join(['aws', 's3', 'cp', 'time_result.txt', time_addr]) + '\n')
+                job_script.write(' '.join(['aws', 's3', 'cp', 'mem_result.txt', mem_addr]) + '\n')
+
+                if 'output' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output'].keys():
+                        path = self.conf[PROFILING]['output'][key]
+                        basename, ext = os.path.splitext(path)
+                        path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
+                        job_script.write(' '.join(['aws', 's3', 'cp', local_name_dict[key], url_base + path]) + '\n')
+                        if machine.mem > prev_mem:
+                            output_dict[entry_count][key] = url_base + path
+
+                response = self.client.list_objects_v2(
+                    Bucket=self.conf[PLATFORM]['bucket'],
+                    Prefix=result_path+'try')
+                if len(response.get('Contents', [])) >= tries and not self.conf[PROFILING].get('force', False):
+                    job_script.close()
+                    print("Result files exist. Job skiped.")
+                else:
+                    job_script.seek(0)
+                    disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
+                    scheduler = BatchScheduler(self.conf, machine, disk_size, job_script.name)
+                    job = scheduler.submit_job(tries)
+                    jobs.append(job)
+                    time.sleep(1)
+            prev_mem = machine.mem
+        if jobs:
+            BatchScheduler.wait_jobs(jobs)
+        self.output_dict = output_dict
+        return result_dict
 
 class BaseProfiler(object):
     def __init__(self, mode, conf):

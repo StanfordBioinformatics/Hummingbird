@@ -21,16 +21,16 @@
       "logging": "logging/haplotypecaller/command-line",
       "thread": [8, 16, 32],
       "input": {
-        "REF": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta",
-        "REF_FAI": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
-        "REF_DICT": "gs://broad-references/hg38/v0/Homo_sapiens_assembly38.dict"
+        "REF": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta",
+        "REF_FAI": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
+        "REF_DICT": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.dict"
       },
       "command": "gatk --java-options \"-Xmx32g\" HaplotypeCaller -R ${REF} -I ${INPUT_BAM} -O ${OUTPUT_VCF}",
       "output": {
-        "OUTPUT_VCF": "output/mutect2/command-line/output.vcf"
+        "OUTPUT_VCF": "output/haplotypecaller/command-line/output.vcf"
       },
       "result": "result/haplotypecaller/command-line",
-      "tries": 1
+      "tries": 3
     }
   ]
 }

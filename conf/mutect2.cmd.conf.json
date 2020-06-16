@@ -14,7 +14,8 @@
     "_target_tumor": 86615196,
     "output": "downsampled/TCRB/case_001",
     "logging": "logging/TCRB/case_001/downsample",
-    "index": true
+    "index": true,
+    "fullrun": true
   },
   "Profiling": [
     {

@@ -11,10 +11,10 @@
       "INPUT_R2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
     },
     "target": 707646124,
-    "fractions": [0.001, 0.01, 0.1, 0.2],
+    "fractions": [0.001, 0.01, 0.1],
     "output": "downsampled/platinum-genomes/fastq",
     "logging": "logging/platinum-genomes/fastq",
-    "fullrun": true
+    "fullrun": false
   },
   "Profiling": [
     {
@@ -92,7 +92,7 @@
       },
       "force": false,
       "disk": "500",
-      "tries": 1
+      "tries": 3
     }
   ]
 }
