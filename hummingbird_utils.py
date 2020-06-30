@@ -4,7 +4,7 @@ import numpy as np
 from scipy.interpolate import Rbf, UnivariateSpline
 from sklearn import linear_model
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use("agg")
 import matplotlib.pyplot as plt
 
 FA_EXT = ['.fa', '.fasta']

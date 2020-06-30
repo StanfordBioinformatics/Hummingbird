@@ -27,7 +27,7 @@ Hummingbird requires some supporting programs:
 2.  [dsub](https://github.com/DataBiosphere/dsub)
 3.  Additional packages: numpy, scipy, matplotlib, scikit-learn, google-cloud-storage, and boto3 etc.
 
-It is highly recommended to use a [virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/) to isolate the running environment. Follow the instructions from the previous link to create a virtual environment, and then activate it:
+It is highly recommended to use a [virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/) to isolate the execution environment. Follow the instructions from the previous link to create a virtual environment, and then activate it:
 ```
 source <virtual-environment-name>/bin/activate
 ```
@@ -73,7 +73,7 @@ Hummingbird has a `conf` folder which contains configuration files for all teste
     - `index` (optional) Default to `false`. Use `samtools` to generate index files for the downsampled input files.
 
 3. `Profiling` Options for Hummingbird's Profiling processes.
-    - `image` The Docker image on which your pipeline will be executed. For AWS backend, it requires you to build a customized image. See documentation [here](AWS/README.md)
+    - `image` The Docker image on which your pipeline will be executed. For AWS backend, it requires you to build a customized image. See documentation [here](AWS/README.md).
     - `logging` (GCP only) Path to a directory in your bucket to store log files for profiling. Do not include the bucket name.
     - `result` Path to a directory in your bucket to store result files for profiling. Do not include the bucket name.
     - `thread` A list of numbers representing number of virtual CPUs on a machine. Default is [8]. It will cause Hummingbird to test the downsampled inputs on a 8 virtual CPUs machine.
@@ -98,7 +98,7 @@ python hummingbird.py [options] <path to your configuration file>
 ```
 For example:
 ```
-python hummingbird.py conf/atac.conf.json
+python hummingbird.py conf/bwa.conf.json
 ```
 Hummingbird has two options:
 

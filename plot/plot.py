@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from sklearn import linear_model
 import matplotlib
-matplotlib.use('TkAgg')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 colors = {
