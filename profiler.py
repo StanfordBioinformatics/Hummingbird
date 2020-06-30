@@ -223,7 +223,7 @@ class BaseProfiler(object):
 class CromwellProfiler(BaseProfiler):
     def profile(self, input_dict, machines):
         result_dict = defaultdict(list)
-        dsub_script = tempfile.NamedTemporaryFile()
+        dsub_script = tempfile.NamedTemporaryFile(mode='w')
         CMD = '''echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
 apt-get -qq update
 apt-get -qq install time wget

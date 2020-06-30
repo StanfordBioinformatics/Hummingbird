@@ -128,7 +128,7 @@ def main():
                     runtimes.append(t)
                     succeeded.append(m)
                 speedups = speedup_efficiency(zipped_runtimes)
-                sorted_runtimes = sorted(zipped_runtimes)
+                sorted_runtimes = sorted(zipped_runtimes, key=lambda x:x[0])
                 prices = [ins.price for ins in succeeded]
                 costs = [t * p for t, p in zip(runtimes, prices)]
                 sorted_costs = sorted(zip(costs, succeeded))
@@ -137,7 +137,7 @@ def main():
                 print('The fastest machine type: {}'.format(bcolors.OKGREEN + sorted_runtimes[0][1].name + bcolors.ENDC))
                 print('The cheapest machine type: {}'.format(bcolors.OKGREEN + sorted_costs[0][1].name + bcolors.ENDC))
                 print('The most cost-efficient machine type: {}'.format(bcolors.OKGREEN + sorted_efficiencies[0][1].name + bcolors.ENDC))
-            if ds_size >= int(target * 0.1) or input("continue?") == 'n':
+            if ds_size >= int(target * 0.1) or input("Try larger downsample size? [Y/n]") == 'n':
                 if profiler.output_dict is not None: # CromwellProfiler returns None output_dict
                     ds_dict = profiler.output_dict # update downsampled input as output from previous workflow
                 break

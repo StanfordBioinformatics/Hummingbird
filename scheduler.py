@@ -1,6 +1,11 @@
-from email import encoders
-from email.MIMEMultipart import MIMEMultipart
-from email.MIMEText import MIMEText
+try:
+    from email import encoders
+    from email.MIMEMultipart import MIMEMultipart
+    from email.MIMEText import MIMEText
+except ImportError:
+    from email import encoders
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
 from string import Template
 import boto3
 import json

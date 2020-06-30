@@ -12,8 +12,7 @@
     },
     "target": 76000000,
     "output": "downsampled/ENCODE/ENCSR356KRQ",
-    "logging": "logging/ENCODE/ENCSR356KRQ",
-    "fullrun": true
+    "logging": "logging/ENCODE/ENCSR356KRQ"
   },
   "Profiling": [
     {
