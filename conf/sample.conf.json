@@ -22,12 +22,18 @@
       "logging": "<logging-directory>",
       "result": "<result-directory>",
       "thread": "list of numeric value",
+      "input": {
+        "FILE": "<input-file>"
+      },
       "input-recursive": {
         "REF": "<input-directory>"
       },
-      "command": "command",
+      "command": "command with substitute",
       "output": {
-        "OUTPUT_SAM": "<outut-file-path>"
+        "OUTPUT_SAM": "<outut-file>"
+      },
+      "output-recursive": {
+        "FOLDER": "<outut-directory>"
       },
       "force": "bool",
       "disk": "numeric value",
