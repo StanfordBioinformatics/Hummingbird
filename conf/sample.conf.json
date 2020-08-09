@@ -37,7 +37,7 @@
       },
       "force": "bool",
       "disk": "numeric value",
-      "tries": "numeric value",
+      "tries": "numeric value"
     }
   ]
 }
