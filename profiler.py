@@ -156,6 +156,10 @@ class Profiler(object):
                     local_name = os.path.basename(input_s3_path)
                     job_script.write(' '.join(['aws', 's3', 'cp', input_s3_path, local_name]) + '\n')
                     local_name_dict[input_key] = local_name
+                if 'input' in self.conf[PROFILING]:
+                    for key, path in self.conf[PROFILING]['input'].items():
+                        local_name_dict[key] = path
+                        job_script.write(' '.join(['aws', 's3', 'cp', url_base + path, path]) + '\n')
                 if 'input-recursive' in self.conf[PROFILING]:
                     for key, path in self.conf[PROFILING]['input-recursive'].items():
                         local_name_dict[key] = path
@@ -163,6 +167,11 @@ class Profiler(object):
                 if 'output' in self.conf[PROFILING]:
                     for key in self.conf[PROFILING]['output'].keys():
                         path = self.conf[PROFILING]['output'][key]
+                        local_name = os.path.basename(path)
+                        local_name_dict[key] = local_name
+                if 'output-recursive' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output-recursive'].keys():
+                        path = self.conf[PROFILING]['output-recursive'][key]
                         local_name = os.path.basename(path)
                         local_name_dict[key] = local_name
                 if self.conf[PROFILING].get('script'):
@@ -192,6 +201,13 @@ class Profiler(object):
                         basename, ext = os.path.splitext(path)
                         path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
                         job_script.write(' '.join(['aws', 's3', 'cp', local_name_dict[key], url_base + path]) + '\n')
+                        if machine.mem > prev_mem:
+                            output_dict[entry_count][key] = url_base + path
+                if 'output-recursive' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output-recursive'].keys():
+                        path = self.conf[PROFILING]['output-recursive'][key]
+                        path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
+                        job_script.write(' '.join(['aws', 's3', 'cp', local_name_dict[key], url_base + path, '--recursive']) + '\n')
                         if machine.mem > prev_mem:
                             output_dict[entry_count][key] = url_base + path
 
@@ -380,6 +396,7 @@ class BashProfiler(BaseProfiler):
                 add_headline('input') # additional inputs for profiling stage
                 add_headline('input-recursive')
                 add_headline('output')
+                add_headline('output-recursive')
                 tsv_writer.writerow(headline)
 
                 for entry_count in input_dict:
@@ -409,6 +426,13 @@ class BashProfiler(BaseProfiler):
                             while ext in ZIP_EXT:
                                 basename, ext = os.path.splitext(basename)
                             path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
+                            row.append(url_base + path)
+                            if machine.mem > prev_mem:
+                                output_dict[entry_count][key] = url_base + path
+                    if 'output-recursive' in self.conf[PROFILING]:
+                        for key in self.conf[PROFILING]['output-recursive'].keys():
+                            path = self.conf[PROFILING]['output-recursive'][key]
+                            path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
                             row.append(url_base + path)
                             if machine.mem > prev_mem:
                                 output_dict[entry_count][key] = url_base + path

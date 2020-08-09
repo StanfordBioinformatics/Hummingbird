@@ -83,7 +83,8 @@ Hummingbird has a `conf` folder which contains configuration files for all teste
         - `json_input` Two dimensional array containing the input for each Cromwell call. For each value in the `thread` option, Hummingbird requires a list referencing each downsampled file specified in the `size` option. These input files vary based on pipelines.
     - Command line tool
         - `command` Command directly executed in the image.
-    - `output` Path in your bucket to where Hummingbird will output the memory and time profiling results. Specify in key-value pairs format, the keys will be used as interpolation of values later. Do not include the bucket name.
+        - `input` and/or `input-recursive` Add any additional input resource in key-value pairs format.
+    - `output` and/or `output-recursive` Path in your bucket to where Hummingbird will output the memory and time profiling results. Specify in key-value pairs format, the keys will be used as interpolation of values later. Do not include the bucket name.
     - `force` (optional) Default to `false`. Set to `true` to force to re-execute pipeline even the result exists.
     - `tries` (optional) Default to 1. Specify the number of tries for each task, the result will be reported as average of multiple tries.
     - `disk` (optional) Default to 500. The size in GB for your data disk size of your instance.
