@@ -59,7 +59,7 @@ In this section we will walk you through how to run Hummingbird on Google cloud 
 12. ```input-recursive``` is where you need to provide any additional files that will be needed during execution. For example if you have your reference files under the ```references/GRCh37lite``` bucket(relative to the bucket created in step 3) then you can mention it in the ```input-recursive``` field with a key such as ```REF```
 13. In the ```command``` field provide the command that is to be executed in the container. Use the keys that were mentioned in the input field and the input-recursive field(if any).
 14. The output file name and path can be mentioned in the ```output``` field. It should be relative to the bucket created in step 3
-15. Once the configuration file is created you can execute Hummingbird by executing ```hummingbird <path to conf file>
+15. Once the configuration file is created you can execute Hummingbird by executing ```hummingbird <path to conf file>```
 
 #### Getting started on AWS Batch
 Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html) and configure:
