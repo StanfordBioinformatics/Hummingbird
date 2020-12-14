@@ -24,6 +24,8 @@ pip install Hummingbird[aws]
 ```
 for AWS
 
+It is recommended to use the ```--install-option="--prefix=$PREFIX_PATH"``` along with pip while installing Hummingbird. This would give users easy access to the sample configuration files present under conf/examples which the users might need to refer to while writing their own configuration file for their own pipeline. Otherwise you will be able to find the configuration files under ```<virtualenv_name>/lib/<python_ver>/site-packages/Hummingbird/conf/examples```
+
 Hummingbird requires pip and python 2.7 or python 3 to be installed before installation.
 
 It is highly recommended to use a [virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/) to isolate the execution environment. Follow the instructions from the previous link to create a virtual environment, and then activate it:
@@ -45,8 +47,19 @@ In this section we will walk you through how to run Hummingbird on Google cloud 
 
 1. Get a list of all projects by executing ```gcloud projects list```. Make a note of the project name of the project in which you want to execute Hummingbird. Add that to the ```project``` field under the ```Platform``` section
 2. Identify which region you want all of the computing resources to be launched in. This would ideally be the same region you provided to the gcloud sdk while setting it up. https://cloud.google.com/compute/docs/regions-zones has more information about regions and zones
-3. Create a new storage bucket with the instructions provided in https://cloud.google.com/storage/docs/creating-buckets#storage-create-bucket-console. You can either create a bucket using the cloud storage browser in the Google Cloud Console, or execute ```gsutil mb gs://<BUCKET_NAME>``` from the command line. If creating the bucket from the command line, provide the ```-p```(project name), ```-c```(storage class) and ```-l```(location) flags to have greater control over the creation of your bucket. Once the bucket is created add it to the  ```bucket``` field under the ```Platform``` section
-4. For a sample BWA run  we will be using the platinum fastq genomes which are publicly hosted on the ```genomics-public-data/platinum-genomes``` cloud storage bucket. 
+3. Create a new storage bucket with the instructions provided in https://cloud.google.com/storage/docs/creating-buckets#storage-create-bucket-console. You can either create a bucket using the cloud storage browser in the Google Cloud Console, or execute ```gsutil mb gs://<BUCKET_NAME>``` from the command line. If creating the bucket from the command line, provide the ```-p```(project name), ```-c```(storage class) and ```-l```(location) flags to have greater control over the creation of your bucket. Once the bucket is created add it to the  ```bucket``` field under the ```Platform``` section. Just provide the bucket name, the full path is not required
+4. For a sample BWA run  we will be using the platinum fastq genomes which are publicly hosted on the ```genomics-public-data/platinum-genomes``` cloud storage bucket. The two fastq files we will be using are ERR194159_1.fastq.gz and ERR194159_2.fastq.gz. In the ```input``` field under ```Downsample``` add ```gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz``` to INPUT_R1 and ```gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz``` to INPUT_R2. For your own input files provide the full Google cloud bucket path including gs://. The inputs need to be specified in key-value format. The key will be used to interpret the value later on. For example in your command you can refer to the first fastq file as ${INPUT_R1}
+5. ```fractions``` represents the extent to which the whole input will be downsampled. You can keep the values as is, or tinker around with it to get different results.
+6. After this we will be adding the output and logging bucket names to the configuration file. The output and logging buckets will be created under the bucket created in step 3. You will only need to provide the bucket path relative to the bucket created in step 3. For example if you created a bucket called bwa-example in step 3 and then you created bwa under bwa-example, and then under bwa you created bwa-logging and bwa-output, then you need to provide bwa/bwa-output to the output field and bwa/bwa-logging to the logging field.
+7. The ```fullrun``` field indicates whether the input will be downsampled or not. Keep it as false to run the downsampled input on the pipeline. Setting it to true would mean that the entire pipeline will be run on the whole input
+8. In the ```image``` field under ```Profiling``` provide the contianer image that contains the pipeline you wish to execute Hummingbird on
+9. In the ```logging``` field provide a bucket where Hummingbird will write the log files that are generated during the profiling step. This should be different from the logging bucket you provided under the Downsample field. It should be relative to the bucket created in step 3
+10. In the ```result``` field provide a bucket that will store the profiling results. It should be relative to the bucket created in step 3
+11. threads?
+12. ```input-recursive``` is where you need to provide any additional files that will be needed during execution. For example if you have your reference files under the ```references/GRCh37lite``` bucket(relative to the bucket created in step 3) then you can mention it in the ```input-recursive``` field with a key such as ```REF```
+13. In the ```command``` field provide the command that is to be executed in the container. Use the keys that were mentioned in the input field and the input-recursive field(if any).
+14. The output file name and path can be mentioned in the ```output``` field. It should be relative to the bucket created in step 3
+15. Once the configuration file is created you can execute Hummingbird by executing ```hummingbird <path to conf file>
 
 #### Getting started on AWS Batch
 Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html) and configure:
@@ -70,7 +83,7 @@ Hummingbird has a `conf` folder which contains configuration files for all teste
     - `target` The number of reads in the original input files. This number will be used for prediction purpose.
     - `output` Path to a directory in your bucket to store output files for downsample. Do not include the bucket name.
     - `logging` (GCP only) Path to a directory in your bucket to store log files for downsample. Do not include the bucket name.
-    - `size` (optional) A list of decimals representing the downsample size. The default list is `[0.0001, 0.01, 0.1]` which means the sample will be downsized to 0.1%, 1%, 10% of its original size.
+    - `fractions` (optional) A list of decimals representing the downsample size. The default list is `[0.0001, 0.01, 0.1]` which means the sample will be downsized to 0.1%, 1%, 10% of its original size.
     - `fullrun` (optional) Default to `false`. Set to `true` to run the whole input without downsampling.
     - `index` (optional) Default to `false`. Use `samtools` to generate index files for the downsampled input files.
 
