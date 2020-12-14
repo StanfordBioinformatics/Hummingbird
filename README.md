@@ -12,28 +12,23 @@ As of now Hummingbird supports Google Cloud (GCP) and Amazon Web Service (AWS) a
 
 ## Getting Started
 
-### Cloning this repo
+### Installation Instructions
 
+Based on which cloud service provider you want to use, Hummingbird can be installed using
 ```
-git clone https://github.com/StanfordBioinformatics/Hummingbird.git
-cd Hummingbird
+pip install Hummingbird[gcp]
 ```
+for Google cloud, and
+```
+pip install Hummingbird[aws]
+```
+for AWS
 
-### Prerequisites
-
-Hummingbird requires some supporting programs:
-
-1.  Python 2.7 or 3
-2.  [dsub](https://github.com/DataBiosphere/dsub)
-3.  Additional packages: numpy, scipy, matplotlib, scikit-learn, google-cloud-storage, and boto3 etc.
+Hummingbird requires pip and python 2.7 or python 3 to be installed before installation.
 
 It is highly recommended to use a [virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/) to isolate the execution environment. Follow the instructions from the previous link to create a virtual environment, and then activate it:
 ```
 source <virtual-environment-name>/bin/activate
-```
-Under this activated environment, install the additional packages by executing:
-```
-pip install -r requirements.txt
 ```
 
 #### Getting started on Google Cloud
