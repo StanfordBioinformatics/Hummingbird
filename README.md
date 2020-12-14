@@ -40,6 +40,13 @@ This will set up your default project and grant credentials to the Google Cloud 
 ```
 gcloud auth application-default login
 ```
+##### Sample run on Google Cloud
+In this section we will walk you through how to run Hummingbird on Google cloud for a sample pipeline(BWA). The assumption is that you have already created a project(https://cloud.google.com/resource-manager/docs/creating-managing-projects#creating_a_project), installed the Google cloud SDK and granted credentials to the SDK. Along with the Google cloud essentials, you also need to have installed Hummingbird. We will be modifying the bwa.conf.json file which is under conf/examples.
+
+1. Get a list of all projects by executing ```gcloud projects list```. Make a note of the project name of the project in which you want to execute Hummingbird. Add that to the ```project``` field under the ```Platform``` section
+2. Identify which region you want all of the computing resources to be launched in. This would ideally be the same region you provided to the gcloud sdk while setting it up. https://cloud.google.com/compute/docs/regions-zones has more information about regions and zones
+3. Create a new storage bucket with the instructions provided in https://cloud.google.com/storage/docs/creating-buckets#storage-create-bucket-console. You can either create a bucket using the cloud storage browser in the Google Cloud Console, or execute ```gsutil mb gs://<BUCKET_NAME>``` from the command line. If creating the bucket from the command line, provide the ```-p```(project name), ```-c```(storage class) and ```-l```(location) flags to have greater control over the creation of your bucket. Once the bucket is created add it to the  ```bucket``` field under the ```Platform``` section
+4. For a sample BWA run  we will be using the platinum fastq genomes which are publicly hosted on the ```genomics-public-data/platinum-genomes``` cloud storage bucket. 
 
 #### Getting started on AWS Batch
 Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html) and configure:
