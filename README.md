@@ -137,3 +137,28 @@ For each stage of the pipeline, Hummingbird will print 3 different configuration
 2. The cheapest: The instance which costs the least is chosen by Hummingbird as the instance with the cheapest configuration.
 
 3. The most efficient: The instance which has the most cost-efficient value, maximizing the computing power of a unit of spending.
+
+### Using different input file formats
+
+In case users want to leverage the downsampling step in Hummingbird but have input files in formats different than BAM or fastq/fastq.gz, please follow the examples below:
+
+1. Input file(s) are in CRAM format
+The user can convert CRAM to SAM using samtools (http://www.htslib.org/doc/samtools-view.html): ```samtools view -C -T ref.fa aln.bam > aln.cram``` 
+Please note that the original reference fasta file is required for this conversion. Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines. For more information on using CRAM files with samtools, please see http://www.htslib.org/workflow/.
+
+2. Input file(s) are in SAM format
+Samtools has a functionality that does this conversion: ```samtools view -bS file.sam | samtools sort - file_sorted```
+Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines.
+
+3. Input file(s) are in FASTQ to uBAM
+In some cases, the bioinformatics pipeline to evaluate accepts unaligned BAM files so conversion of the FASTQ files to uBAM is needed.
+FastqToSam tool within the Picard suite of tools (https://broadinstitute.github.io/picard/command-line-overview.html#FastqToSam) can be used: 
+```java -jar picard.jar FastqToSam F1=file_1.fastq O=fastq_to_bam.bam SM=for_tool_testing```
+      
+4. Aligned BAM to unmapped BAM
+The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.jar RevertSam I=input.bam O=reverted.bam```
+Any of the above functionalities can be incoporated to the Hummingbird code by building a docker image of the tool and adding the required command lines for an automated execution.
+
+Please note that generating the index file after the conversion may be necessary for subsequent analysis using software tools or bioinformatics pipelines.
+
+We hope to continue adding support to different input file formats in the downsampling step of Hummingbird.
