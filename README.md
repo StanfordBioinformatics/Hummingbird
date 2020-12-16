@@ -138,27 +138,74 @@ For each stage of the pipeline, Hummingbird will print 3 different configuration
 
 3. The most efficient: The instance which has the most cost-efficient value, maximizing the computing power of a unit of spending.
 
-### Using different input file formats
+### Using different input file formats for co
 
 In case users want to leverage the downsampling step in Hummingbird but have input files in formats different than BAM or fastq/fastq.gz, please follow the examples below:
 
 1. Input file(s) are in CRAM format
-The user can convert CRAM to SAM using samtools (http://www.htslib.org/doc/samtools-view.html): ```samtools view -C -T ref.fa aln.bam > aln.cram``` 
+
+The user can convert CRAM to SAM using `samtools` (http://www.htslib.org/doc/samtools-view.html): ```samtools view -C -T ref.fa aln.bam > aln.cram``` 
 Please note that the original reference fasta file is required for this conversion. Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines. For more information on using CRAM files with samtools, please see http://www.htslib.org/workflow/.
 
 2. Input file(s) are in SAM format
-Samtools has a functionality that does this conversion: ```samtools view -bS file.sam | samtools sort - file_sorted```
+
+`Samtools` has a functionality that does this conversion: ```samtools view -bS file.sam | samtools sort - file_sorted```
 Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines.
 
-3. Input file(s) are in FASTQ to uBAM
+3. Input file(s) are in FASTQ but need uBAM
+
 In some cases, the bioinformatics pipeline to evaluate accepts unaligned BAM files so conversion of the FASTQ files to uBAM is needed.
 FastqToSam tool within the Picard suite of tools (https://broadinstitute.github.io/picard/command-line-overview.html#FastqToSam) can be used: 
 ```java -jar picard.jar FastqToSam F1=file_1.fastq O=fastq_to_bam.bam SM=for_tool_testing```
       
 4. Aligned BAM to unmapped BAM
-The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.jar RevertSam I=input.bam O=reverted.bam```
-Any of the above functionalities can be incoporated to the Hummingbird code by building a docker image of the tool and adding the required command lines for an automated execution.
+
+The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.jar RevertSam I=input.bam O=reverted.bam``` where the `input.bam` is the aligned BAM and `reverted.bam` is the output unmapped BAM.
+
+5. BED to BAM 
+
+`Bedtools` can be used to convert a file from BED format to BAM: ```bedToBam -i input.bed -g reference_genome.fasta > input_converted.bam```
+
+If required, BED12 file (has blocked features) can be converted to BED6 (each feature listed in a separate line) format using: ```bed12ToBed6 -i input_bed12.bed```. For details on options, please refer to bedtools documentation.
+
+6. BEDPE to BAM
+
+
+7. BAM to BED/BEDPE formats
+
+Please note that currently Hummingbird does not natively support BEDPE format. So, users can skip only the downsampling step and continue using all features of Hummingbird.
+
+a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools` (https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html):
+```bedtools bamtobed -i input.bam```
+
+
+b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe```
+
+In some cases, sorting and indexing of the input.bam file may be required.
+
+Any of the above functionalities from various format conversion tools can be incoporated to the Hummingbird code by building a docker image of the tool and adding the required command lines for an automated execution.
 
 Please note that generating the index file after the conversion may be necessary for subsequent analysis using software tools or bioinformatics pipelines.
 
-We hope to continue adding support to different input file formats in the downsampling step of Hummingbird.
+### Alternative downsampling methods not available in Hummingbird
+
+For users interested in downsampling techniques other than the ones supported by Hummingbird, please refer to the examples below:
+
+1. Downsampling SAM/BAM file using `DownsampleSam` tool from Picard 
+
+For retaining only 2% of the reads in the input file: ```java -jar picard.jar DownsampleSam I=input.bam O=downsampled.bam STRATEGY=Chained P=0.02 ACCURACY=0.0001```
+
+This tool offers a number of strategies for downsampling as well as levels of accuracy which can be dependent on memory.For more options that can be used with DownsampleSam, please see https://gatk.broadinstitute.org/hc/en-us/articles/360036431292-DownsampleSam-Picard-.
+
+2. Downsampling SAM/BAM files at the chromosome level using `samtools`
+
+For example, to extract chromosome 22 from a bam file and obtain a bam file with only chr 22: ```samtools view -b -o <output.bam> -@<INT_threads> <input.bam> chr22``` where `threads` is an optional parameter to speed up the process of extraction. Regions within a specific chromosome can also be specified for extraction.
+
+The user needs to ensure that the `input.bam` file is sorted (```samtools sort example.bam -o example_sorted.bam```), indexed (```samtools index example_sorted.bam```) and chromosome specified matches the chromosome name in `input.bam`. Further details on samtools view usage can be foud here: http://www.htslib.org/doc/samtools-view.html.
+
+3. Downsampling SAM/BAM 
+
+
+The above downsampled files can be provided to Hummingbird to run the Memory Profiler step and then receive the recommended instance types from the Recommendation Engine.
+
+We will be adding support to different input file formats in the downsampling step of Hummingbird in the future.
