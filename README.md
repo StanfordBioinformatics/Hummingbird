@@ -149,55 +149,55 @@ In case users want to leverage the downsampling step in Hummingbird but have inp
 
 2. Input file(s) are in SAM format
 
-`Samtools` has a functionality that does this conversion: ```samtools view -bS file.sam | samtools sort - file_sorted```
-Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines.
+   `Samtools` has a functionality that does this conversion: ```samtools view -bS file.sam | samtools sort - file_sorted```
+   Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines.
 
 3. Input file(s) are in FASTQ but need uBAM
 
-In some cases, the bioinformatics pipeline to evaluate accepts unaligned BAM files so conversion of the FASTQ files to uBAM is needed.
-FastqToSam tool within the Picard suite of tools (https://broadinstitute.github.io/picard/command-line-overview.html#FastqToSam) can be used: 
-```java -jar picard.jar FastqToSam F1=file_1.fastq O=fastq_to_bam.bam SM=for_tool_testing```
+   In some cases, the bioinformatics pipeline to evaluate accepts unaligned BAM files so conversion of the FASTQ files to uBAM is needed.
+   FastqToSam tool within the Picard suite of tools (https://broadinstitute.github.io/picard/command-line-overview.html#FastqToSam) can be used: 
+   ```java -jar picard.jar FastqToSam F1=file_1.fastq O=fastq_to_bam.bam SM=for_tool_testing```
       
 4. Aligned BAM to unmapped BAM
 
-The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.jar RevertSam I=input.bam O=reverted.bam``` where the `input.bam` is the aligned BAM and `reverted.bam` is the output unmapped BAM.
+   The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.jar RevertSam I=input.bam O=reverted.bam``` where the `input.bam` is the          aligned BAM and `reverted.bam` is the output unmapped BAM.
 
 5. BED to BAM 
 
-`Bedtools` can be used to convert a file from BED format to BAM: ```bedtools bedToBam -i input.bed -g genome_file > input_converted.bam``` where `genome_file` is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs. 
+   `Bedtools` can be used to convert a file from BED format to BAM: ```bedtools bedToBam -i input.bed -g genome_file > input_converted.bam``` where `genome_file`    is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs. 
 
-The `genome_file` can be fasta index file in the `.fai` format where the first two columns are extracted (indexing can be done using ```samtools faidx reference.fasta```) and the "chr" prefix is added to the chromosome names. For more details on `genome_file` and pre-defined genome files available with bedtools distribution, please see https://bedtools.readthedocs.io/en/latest/content/general-usage.html#genome-file-format.
+   The `genome_file` can be fasta index file in the `.fai` format where the first two columns are extracted (indexing can be done using ```samtools faidx            reference.fasta```) and the "chr" prefix is added to the chromosome names. For more details on `genome_file` and pre-defined genome files available with          bedtools distribution, please see https://bedtools.readthedocs.io/en/latest/content/general-usage.html#genome-file-format.
 
-In case the input file is in BED12 format and spliced BAM entries are to be generated, use: ```bedToBam -i input_bed12format.bed -g genome_file -bed12 > input_converted_spliced.bam```
+   In case the input file is in BED12 format and spliced BAM entries are to be generated, use: ```bedToBam -i input_bed12format.bed -g genome_file -bed12 >          input_converted_spliced.bam```
 
-If required, BED12 file (has blocked features) can be converted to BED6 (each feature listed in a separate line) format using: ```bedtools bed12ToBed6 -i input_bed12.bed```. For details on options, please refer to bedtools documentation (https://bedtools.readthedocs.io/en/latest/content/overview.html).
+   If required, BED12 file (has blocked features) can be converted to BED6 (each feature listed in a separate line) format using: ```bedtools bed12ToBed6 -i          input_bed12.bed```. For details on options, please refer to bedtools documentation (https://bedtools.readthedocs.io/en/latest/content/overview.html).
 
 6. GFF to BAM
 
-`Bedtools` can help convert a feature file such as ones in GFF format to BAM: ```bedtools bedToBam -i input.gff -g genome_file > input_converted.bam``` where `genome_file` is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs.
+   `Bedtools` can help convert a feature file such as ones in GFF format to BAM: ```bedtools bedToBam -i input.gff -g genome_file > input_converted.bam``` where      `genome_file` is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs.
 
-Please refer to BED to BAM for more details on `genome_file` format.
+   Please refer to BED to BAM for more details on `genome_file` format.
 
 7. VCF to BAM
 
-`Bedtools` can help convert a feature file such as ones in GFF format to BAM: ```bedtools bedToBam -i input.vcf -g genome_file > input_converted.bam``` where `genome_file` is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs.
+   `Bedtools` can help convert a feature file such as ones in GFF format to BAM: ```bedtools bedToBam -i input.vcf -g genome_file > input_converted.bam``` where      `genome_file` is not a fasta file but a two column file with list of chromosomes and the corresponding chromosome sizes in basepairs.
 
 
 8. BAM to BED/BEDPE formats
 
-Please note that currently Hummingbird does not natively support BEDPE format. However, users can skip the downsampling step (please check Downsample option in Hummingbird for more details) and continue using other features of Hummingbird.
+   Please note that currently Hummingbird does not natively support BEDPE format. However, users can skip the downsampling step (please check Downsample option in    Hummingbird for more details) and continue using other features of Hummingbird.
 
-  a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools`: ```bedtools bamtobed -i input.bam > output.bed```
+    a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools`: ```bedtools bamtobed -i input.bam > output.bed```
 
-  For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
+       For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
 
-  b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe > output.bedpe```
+    b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe > output.bedpe```
 
-  c) For non-lossy conversions of BAM to BED can be performed using `bam2bed`functionality in the `BEDOPS` suite of tools: ```bam2bed --keep-header < input.bam > output.bed```
+    c) For non-lossy conversions of BAM to BED can be performed using `bam2bed`functionality in the `BEDOPS` suite of tools: ```bam2bed --keep-header < input.bam        > output.bed```
   
-   The `--keep-header` option is needed for the header information to be included in the output file. 
+       The `--keep-header` option is needed for the header information to be included in the output file. 
   
-  In some cases, sorting and indexing of the input.bam file may be required for subsequent analyses.
+      In some cases, sorting and indexing of the input.bam file may be required for subsequent analyses.
 
 9. VCF to BED/BEDPE formats
 
