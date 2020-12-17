@@ -189,7 +189,7 @@ In case users want to leverage the downsampling step in Hummingbird but have inp
 
     a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools`: ```bedtools bamtobed -i input.bam > output.bed```
 
-       For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
+      For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
 
     b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe > output.bedpe```
 
