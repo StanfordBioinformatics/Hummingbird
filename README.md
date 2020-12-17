@@ -55,7 +55,7 @@ In this section we will walk you through how to run Hummingbird on Google Cloud 
 8. In the ```image``` field, under ```Profiling``` provide the container image that contains the pipeline on which you wish to execute Hummingbird.
 9. In the ```logging``` field, provide a bucket where Hummingbird can write the log files that are generated during the profiling step. This should be different from the logging bucket you provided under the Downsample field. It should be relative to the bucket created in Step 3. The logging bucket option is specific to gcp and dsub
 10. In the ```result``` field, provide a bucket that will store the profiling results. It should be relative to the bucket created in Step 3.
-11. threads?
+11. In the ```threads``` field provide a list of numbers representing number of virtual CPUs on a machine. Default is [8]. If setting fullrun to true, change it to a higher number or else the tool might fail due to execution on an instance with insufficient memory
 12. ```input-recursive``` is where you need to provide any additional files located within a directory that will be needed during execution. For example, if you have your reference files under the ```references/GRCh37lite``` bucket(relative to the bucket created in Step 3) then you can mention it in the ```input-recursive``` field with a key such as ```REF```
 13. In the ```command``` field provide the command that is to be executed in the container. Use the keys that were mentioned in the input field and the input-recursive field(if any).
 14. The output file name and path can be mentioned in the ```output``` field. It should be relative to the bucket created in Step 3.
