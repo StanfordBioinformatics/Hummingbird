@@ -195,40 +195,40 @@ In case users want to leverage the downsampling step in Hummingbird but have inp
 
     c) For non-lossy conversions of BAM to BED can be performed using `bam2bed`functionality in the `BEDOPS` suite of tools: ```bam2bed --keep-header < input.bam        > output.bed```
   
-       The `--keep-header` option is needed for the header information to be included in the output file. 
+      The `--keep-header` option is needed for the header information to be included in the output file. 
   
       In some cases, sorting and indexing of the input.bam file may be required for subsequent analyses.
 
 9. VCF to BED/BEDPE formats
 
-A number of structural variant based tools help with conversion from VCF to BED or BEDPE formats such as 
+   A number of structural variant based tools help with conversion from VCF to BED or BEDPE formats such as 
 
-  a) `lumpysv` (https://github.com/arq5x/lumpy-sv): Please refer to the script `vcfToBedpe.py`.
+    a) `lumpysv` (https://github.com/arq5x/lumpy-sv): Please refer to the script `vcfToBedpe.py`.
     
-  b) `SURVIVOR`(https://github.com/fritzsedlazeck/SURVIVOR): Please refer to the `bedpetovcf` functionality.
+    b) `SURVIVOR`(https://github.com/fritzsedlazeck/SURVIVOR): Please refer to the `bedpetovcf` functionality.
     
-  c) `svtools`(https://github.com/hall-lab/svtools): Please refer to the `bedpetovcf` and `vcftobedpe` subcommands. The benchmarking details on these subcommands can be found in Table 3 of their publication (https://academic.oup.com/bioinformatics/article/35/22/4782/5520944) which gives an idea of the computational resources required and execution times.
+    c) `svtools`(https://github.com/hall-lab/svtools): Please refer to the `bedpetovcf` and `vcftobedpe` subcommands. The benchmarking details on these                  subcommands can be found in Table 3 of their publication (https://academic.oup.com/bioinformatics/article/35/22/4782/5520944) which gives an idea of the          computational resources required and execution times.
 
 10. BEDPE to BED12 format
 
-The subcommand `bedpetobed12` within the `svtools` (https://github.com/hall-lab/svtools) can convert a BEDPE file to a BED12 format.
+    The subcommand `bedpetobed12` within the `svtools` (https://github.com/hall-lab/svtools) can convert a BEDPE file to a BED12 format.
 
 11. BAM to FASTQ
 
-  a) Using the `bamtofastq` functionality in `bedtools`, for paired-end data: ```bedtools bamtofastq -i aln.qsort.bam -fq aln.R1.fq -fq2 aln.R2.fq```
+     a) Using the `bamtofastq` functionality in `bedtools`, for paired-end data: ```bedtools bamtofastq -i aln.qsort.bam -fq aln.R1.fq -fq2 aln.R2.fq```
   
-  The input bam file has to be sorted by query name that can be done using ```samtools sort -n aln.bam aln.qsort```
-  In case of single-end reads, conversion is done using: ```bedtools bamtofastq  -i aln.bam -fq aln.fq```
-  Further information on the various options that can be used in the `bamtofastq` command line, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtofastq.html
+       The input bam file has to be sorted by query name that can be done using ```samtools sort -n aln.bam aln.qsort```
+       In case of single-end reads, conversion is done using: ```bedtools bamtofastq  -i aln.bam -fq aln.fq```
+       Further information on the various options that can be used in the `bamtofastq` command line, please see                                                          https://bedtools.readthedocs.io/en/latest/content/tools/bamtofastq.html
 
-  b) Using `samtools`, for paired-end data: ```samtools fastq -1 paired1.fq -2 paired2.fq -0 /dev/null -s /dev/null -n in_sorted.bam```
-  The input bam file has to be sorted before providing it for the conversion similar to the explanation in 11 (a) above. 
-  For more details on the options, please refer to http://www.htslib.org/doc/samtools-fasta.html.
+     b) Using `samtools`, for paired-end data: ```samtools fastq -1 paired1.fq -2 paired2.fq -0 /dev/null -s /dev/null -n in_sorted.bam```
+        The input bam file has to be sorted before providing it for the conversion similar to the explanation in 11 (a) above. 
+        For more details on the options, please refer to http://www.htslib.org/doc/samtools-fasta.html.
 
-Alternative tools for conversion of BAM to FASTQ can be found here: https://sites.google.com/site/wiki4metagenomics/tools/samtools/converting-bam-to-fastq.
+    Alternative tools for conversion of BAM to FASTQ can be found here: https://sites.google.com/site/wiki4metagenomics/tools/samtools/converting-bam-to-fastq.
 
 
-For other file format conversions not listed here the,
+For other file format conversions not listed here refer to,
 
   a) GALAXY suite of tools can be used. Please refer to "Convert Formats" in https://vclv99-241.hpc.ncsu.edu/?tool_id=toolshed.g2.bx.psu.edu%2Frepos%2Fvipints%2Ffml_gff3togtf%2Ffml_bed2gff%2F2.1.0&version=2.1.0&__identifer=ibvartqtce.
  
