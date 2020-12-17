@@ -168,7 +168,7 @@ The RevertSam tool from the Picard tools suite can be used: ```java -jar picard.
 
 The `genome_file` can be fasta index file in the `.fai` format where the first two columns are extracted (indexing can be done using ```samtools faidx reference.fasta```) and the "chr" prefix is added to the chromosome names. For more details on `genome_file` and pre-defined genome files available with bedtools distribution, please see https://bedtools.readthedocs.io/en/latest/content/general-usage.html#genome-file-format.
 
-In case the input file is in BED12 format and spliced BAM entries are to be generated, use: ```bedToBam -i input_bed12format.bed -g genome_file -bed12 > input_converted_spliced.bam``
+In case the input file is in BED12 format and spliced BAM entries are to be generated, use: ```bedToBam -i input_bed12format.bed -g genome_file -bed12 > input_converted_spliced.bam```
 
 If required, BED12 file (has blocked features) can be converted to BED6 (each feature listed in a separate line) format using: ```bedtools bed12ToBed6 -i input_bed12.bed```. For details on options, please refer to bedtools documentation (https://bedtools.readthedocs.io/en/latest/content/overview.html).
 
@@ -187,62 +187,93 @@ Please refer to BED to BAM for more details on `genome_file` format.
 
 Please note that currently Hummingbird does not natively support BEDPE format. However, users can skip the downsampling step (please check Downsample option in Hummingbird for more details) and continue using other features of Hummingbird.
 
-    a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools`: ```bedtools bamtobed -i input.bam```
+  a) An input BAM file can be converted to a BED file (BED6 format by default) using `bedtools`: ```bedtools bamtobed -i input.bam > output.bed```
 
-    For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
+  For further details, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtobed.html.
 
-    b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe```
+  b) An input BAM file can be converted to a BEDPE file using `bedtools`: ```bedtools bamtobed -i input.bam -bedpe > output.bedpe```
 
-    In some cases, sorting and indexing of the input.bam file may be required.
+  c) For non-lossy conversions of BAM to BED can be performed using `bam2bed`functionality in the `BEDOPS` suite of tools: ```bam2bed --keep-header < input.bam > output.bed```
+  
+   The `--keep-header` option is needed for the header information to be included in the output file. 
+  
+  In some cases, sorting and indexing of the input.bam file may be required for subsequent analyses.
 
 9. VCF to BED/BEDPE formats
 
 A number of structural variant based tools help with conversion from VCF to BED or BEDPE formats such as 
 
-    a) `lumpysv` (https://github.com/arq5x/lumpy-sv): Please refer to the script `vcfToBedpe.py`.
+  a) `lumpysv` (https://github.com/arq5x/lumpy-sv): Please refer to the script `vcfToBedpe.py`.
     
-    b) `SURVIVOR`(https://github.com/fritzsedlazeck/SURVIVOR): Please refer to the `bedpetovcf` functionality.
+  b) `SURVIVOR`(https://github.com/fritzsedlazeck/SURVIVOR): Please refer to the `bedpetovcf` functionality.
     
-    c) `svtools`(https://github.com/hall-lab/svtools): Please refer to the `bedpetovcf` and `vcftobedpe` subcommands.
+  c) `svtools`(https://github.com/hall-lab/svtools): Please refer to the `bedpetovcf` and `vcftobedpe` subcommands. The benchmarking details on these subcommands can be found in Table 3 of their publication (https://academic.oup.com/bioinformatics/article/35/22/4782/5520944) which gives an idea of the computational resources required and execution times.
+
+10. BEDPE to BED12 format
+
+The subcommand `bedpetobed12` within the `svtools` (https://github.com/hall-lab/svtools) can convert a BEDPE file to a BED12 format.
+
+11. BAM to FASTQ
+
+  a) Using the `bamtofastq` functionality in `bedtools`, for paired-end data: ```bedtools bamtofastq -i aln.qsort.bam -fq aln.R1.fq -fq2 aln.R2.fq```
+  
+  The input bam file has to be sorted by query name that can be done using ```samtools sort -n aln.bam aln.qsort```
+  In case of single-end reads, conversion is done using: ```bedtools bamtofastq  -i aln.bam -fq aln.fq```
+  
+Further information on the various options that can be used in the `bamtofastq` command line, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtofastq.html
+
+  b) Using `samtools`, for paired-end data: ```samtools fastq -1 paired1.fq -2 paired2.fq -0 /dev/null -s /dev/null -n in_sorted.bam```
+  The input bam file has to be sorted before providing it for the conversion similar to the explanation in 11 (a) above. 
+  For more details on the options, please refer to http://www.htslib.org/doc/samtools-fasta.html.
+
+Alternative tools for conversion of BAM to FASTQ can be found here: https://sites.google.com/site/wiki4metagenomics/tools/samtools/converting-bam-to-fastq.
+
 
 For other file format conversions not listed here the,
 
-    a) GALAXY suite of tools can be used. Please refer to "Convert Formats" in https://vclv99-241.hpc.ncsu.edu/?tool_id=toolshed.g2.bx.psu.edu%2Frepos%2Fvipints%2Ffml_gff3togtf%2Ffml_bed2gff%2F2.1.0&version=2.1.0&__identifer=ibvartqtce.
+  a) GALAXY suite of tools can be used. Please refer to "Convert Formats" in https://vclv99-241.hpc.ncsu.edu/?tool_id=toolshed.g2.bx.psu.edu%2Frepos%2Fvipints%2Ffml_gff3togtf%2Ffml_bed2gff%2F2.1.0&version=2.1.0&__identifer=ibvartqtce.
  
-    b)Jvarkit:Java utilities for Bioinfomatics can be used. Please see http://lindenb.github.io/jvarkit/. 
+  b) Jvarkit: Java utilities for Bioinfomatics can be used. Please see http://lindenb.github.io/jvarkit/. 
 
 
 Any of the above functionalities from various format conversion tools can be incoporated to the Hummingbird code by building a docker image of the tool and adding the required command lines for an automated execution.
 
 
-Please note that generating the index file after the conversion may be necessary for subsequent analysis using software tools or bioinformatics pipelines.
+Please note that sorting and generating the index file after the conversion may be necessary for subsequent analysis using software tools or bioinformatics pipelines.
 
 
 ### Alternative downsampling methods not currently available in Hummingbird
 
 For users interested in downsampling techniques other than the ones supported by Hummingbird, please refer to the examples below:
 
-1. Downsampling SAM/BAM file using `DownsampleSam` tool from Picard 
+1. Downsampling SAM/BAM files using `DownsampleSam` tool from Picard 
 
-For retaining only 2% of the reads in the input file: ```java -jar picard.jar DownsampleSam I=input.bam O=downsampled.bam STRATEGY=Chained P=0.02 ACCURACY=0.0001```
+NOTE: Implemented in Hummingbird but is fixed in terms of options used within the Picard tool as in the following command line ```java -jar picard.jar DownsampleSam I=input.bam O=downsampled.bam STRATEGY=Chained P=0.02 ACCURACY=0.0001``` which retains only 2% of the reads in the input file and this percentage comes from the downsampling fraction(s) provided by the Hummingbird user.
 
-This tool offers a number of strategies for downsampling as well as levels of accuracy which can be dependent on memory.For more options that can be used with DownsampleSam, please see https://gatk.broadinstitute.org/hc/en-us/articles/360036431292-DownsampleSam-Picard-.
+For a better accuracy when dealing with smaller fractions such as retaining 0.001% of the reads, one can use ```java -jar picard.jar DownsampleSam I=input.bam O=downsampled.bam STRATEGY=HighAccuracy P=0.00001 ACCURACY=0.0000001```
+
+This tool offers a number of strategies for downsampling as well as levels of accuracy (combinations of which are not offered by Hummingbird currently) which can be dependent on memory availability.
+
+For more options that can be used with DownsampleSam, please see https://gatk.broadinstitute.org/hc/en-us/articles/360036431292-DownsampleSam-Picard-.
 
 2. Downsampling SAM/BAM files at the chromosome level using `samtools`
 
 For example, to extract chromosome 22 from a bam file and obtain a bam file with only chr 22: ```samtools view -b -o <output.bam> -@<INT_threads> <input.bam> chr22``` where `threads` is an optional parameter to speed up the process of extraction. Regions within a specific chromosome can also be specified for extraction.
 
-The user needs to ensure that the `input.bam` file is sorted (```samtools sort example.bam -o example_sorted.bam```), indexed (```samtools index example_sorted.bam```) and chromosome specified matches the chromosome name in `input.bam`. Further details on samtools view usage can be foud here: http://www.htslib.org/doc/samtools-view.html.
+The user needs to ensure that the `input.bam` file is sorted (```samtools sort example.bam -o example_sorted.bam```), indexed (```samtools index example_sorted.bam```) and chromosome specified matches the chromosome name in `input.bam`. Further details on samtools view usage can be found here: http://www.htslib.org/doc/samtools-view.html.
 
-3. Downsampling SAM/BAM files using `bamtools`
+3. Downsampling BAM files at the chromosomal region level using ENSEMBL tool `Data Slicer` 
 
+Another way downsampling BAM files is via the `Data Slicer` tool (http://grch37.ensembl.org/Homo_sapiens/Tools/DataSlicer) available as part of the ENSEMBLE suite of tools that provides a GUI for the users. The downsampling of the BAM is done based on chromosome and coordinates provided by the user. Details on the usage can be found here grch37.ensembl.org/Help/View?id=575.
 
 4. Downsampling VCF files
 
-Using the `DownSampleVcf` function in the `jvarkit` tool (http://lindenb.github.io/jvarkit/DownSampleVcf.html), a VCF file can downsampled by specifying the number of random variants to be extracted: ```curl -skL "ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/ALL.wgs.phase3_shapeit2_mvncall_integrated_v5a.20130502.sites.vcf.gz" | gunzip -c |java -jar dist/downsamplevcf.jar -n 100 > output.vcf```
+  a) Using the `DownSampleVcf` function in the `jvarkit` tool (http://lindenb.github.io/jvarkit/DownSampleVcf.html), a VCF file can downsampled by specifying the number of random variants to be extracted: ```curl -skL "ftp://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/ALL.wgs.phase3_shapeit2_mvncall_integrated_v5a.20130502.sites.vcf.gz" | gunzip -c |java -jar dist/downsamplevcf.jar -n 100 > output.vcf```
 
-5. Downsampling GFF files
+  b) Using the `Data Slicer` tool (http://grch37.ensembl.org/Homo_sapiens/Tools/DataSlicer) from the ENSEMBLE project which provides a GUI for the users and subsamples based on chromosome and coordinates provided by the user. For further help on usage, please refer to grch37.ensembl.org/Help/View?id=575.
 
+
+Note:Some of the file formats other than BAM or fastq/fastq.gz if provided in the gunzip compressed format, can be downsampled by the `zless` functionality in Hummingbird as long as the total number of lines in the original input file is provided using the `target` flag in the `Downsample` option.
 
 The above downsampled files can be provided to Hummingbird to run the Memory Profiler step and then receive the recommended instance types from the Recommendation Engine. 
 
