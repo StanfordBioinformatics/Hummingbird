@@ -144,8 +144,8 @@ In case users want to leverage the downsampling step in Hummingbird but have inp
 
 1. Input file(s) are in CRAM format
 
-The user can convert CRAM to SAM using `samtools` (http://www.htslib.org/doc/samtools-view.html): ```samtools view -C -T ref.fa aln.bam > aln.cram``` 
-Please note that the original reference fasta file is required for this conversion. Generating the index file after conversion may be necessary for subsequent analysis using software tools or pipelines. For more information on using CRAM files with samtools, please see http://www.htslib.org/workflow/.
+   The user can convert CRAM to SAM using `samtools` (http://www.htslib.org/doc/samtools-view.html): ```samtools view -C -T ref.fa aln.bam > aln.cram``` 
+   Please note that the original reference fasta file is required for this conversion. Generating the index file after conversion may be necessary for subsequent    analysis using software tools or pipelines. For more information on using CRAM files with samtools, please see http://www.htslib.org/workflow/.
 
 2. Input file(s) are in SAM format
 
