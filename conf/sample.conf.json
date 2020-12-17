@@ -45,7 +45,7 @@
       "result": "<result-directory>",
       "thread": "list of numeric value",
       "command": "refer to OUTPUT1 in command. Thus ensuring output of previous step is input to this step. This way you can chain multiple stages of a pipeline together",
-      output": {
+      "output": {
         "OUTPUT2": "<output-file>"
       },
       "output-recursive": {
