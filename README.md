@@ -219,8 +219,7 @@ The subcommand `bedpetobed12` within the `svtools` (https://github.com/hall-lab/
   
   The input bam file has to be sorted by query name that can be done using ```samtools sort -n aln.bam aln.qsort```
   In case of single-end reads, conversion is done using: ```bedtools bamtofastq  -i aln.bam -fq aln.fq```
-  
-Further information on the various options that can be used in the `bamtofastq` command line, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtofastq.html
+  Further information on the various options that can be used in the `bamtofastq` command line, please see https://bedtools.readthedocs.io/en/latest/content/tools/bamtofastq.html
 
   b) Using `samtools`, for paired-end data: ```samtools fastq -1 paired1.fq -2 paired2.fq -0 /dev/null -s /dev/null -n in_sorted.bam```
   The input bam file has to be sorted before providing it for the conversion similar to the explanation in 11 (a) above. 
@@ -253,7 +252,6 @@ NOTE: Implemented in Hummingbird but is fixed in terms of options used within th
 For a better accuracy when dealing with smaller fractions such as retaining 0.001% of the reads, one can use ```java -jar picard.jar DownsampleSam I=input.bam O=downsampled.bam STRATEGY=HighAccuracy P=0.00001 ACCURACY=0.0000001```
 
 This tool offers a number of strategies for downsampling as well as levels of accuracy (combinations of which are not offered by Hummingbird currently) which can be dependent on memory availability.
-
 For more options that can be used with DownsampleSam, please see https://gatk.broadinstitute.org/hc/en-us/articles/360036431292-DownsampleSam-Picard-.
 
 2. Downsampling SAM/BAM files at the chromosome level using `samtools`
@@ -273,7 +271,7 @@ Another way downsampling BAM files is via the `Data Slicer` tool (http://grch37.
   b) Using the `Data Slicer` tool (http://grch37.ensembl.org/Homo_sapiens/Tools/DataSlicer) from the ENSEMBLE project which provides a GUI for the users and subsamples based on chromosome and coordinates provided by the user. For further help on usage, please refer to grch37.ensembl.org/Help/View?id=575.
 
 
-Note:Some of the file formats other than BAM or fastq/fastq.gz if provided in the gunzip compressed format, can be downsampled by the `zless` functionality in Hummingbird as long as the total number of lines in the original input file is provided using the `target` flag in the `Downsample` option.
+NOTE: Some of the file formats other than BAM or fastq/fastq.gz if provided in the gunzip compressed format, can be downsampled by the `zless` functionality in Hummingbird as long as the total number of lines in the original input file is provided using the `target` flag in the `Downsample` option.
 
 The above downsampled files can be provided to Hummingbird to run the Memory Profiler step and then receive the recommended instance types from the Recommendation Engine. 
 
