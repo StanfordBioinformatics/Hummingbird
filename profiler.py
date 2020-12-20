@@ -262,7 +262,7 @@ class Profiler(object):
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
-                machines.append(AzureInstance('Standard_E' + AWSInstance.thread_suffix[thread] + 's_v3'))
+                machines.append(AzureInstance('Standard_E' + AWSInstance.thread_suffix[thread] + '_v3'))
         tries = self.conf[PROFILING].get('tries', 1)
 
         result_dict = defaultdict(list)

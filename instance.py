@@ -181,12 +181,12 @@ class AWSInstance(Instance):
 
 class AzureInstance(Instance):
     pricing = {
-        'Standard_E2s_v3': 0.148,
-        'Standard_E4s_v3': 0.296,
-        'Standard_E8s_v3': 0.56,
-        'Standard_E16s_v3': 1.12,
-        'Standard_E20s_v3': 1.48,
-        'Standard_E32s_v3': 2.24,
+        'Standard_E2_v3': 0.148,
+        'Standard_E4_v3': 0.296,
+        'Standard_E8_v3': 0.56,
+        'Standard_E16_v3': 1.12,
+        'Standard_E20_v3': 1.48,
+        'Standard_E32_v3': 2.24,
     }
 
     def __init__(self, machine=None, name=None, cpu=None, mem=None):
@@ -195,7 +195,7 @@ class AzureInstance(Instance):
                 mem = 16
             if not cpu:
                 cpu = 2
-            super(AzureInstance, self).__init__('Standard_E2s_v3', cpu, mem)
+            super(AzureInstance, self).__init__('Standard_E2_v3', cpu, mem)
         elif machine:
             vcpu, mem = self.get_machine_specs(machine)
             super(AzureInstance, self).__init__(name, vcpu, mem)
@@ -222,7 +222,7 @@ class AzureInstance(Instance):
     @staticmethod
     def get_machine_types(location, cpu_list, min_mem):
         valid, invalid = [], []
-        all_machines = AzureInstance.filter_matchines(location, "[?starts_with(name, 'Standard_E')]|[?ends_with(name, 's_v4')]|[?numberOfCores<=\`32\`]")
+        all_machines = AzureInstance.filter_matchines(location, "[?starts_with(name, 'Standard_E')]|[?ends_with(name, '_v3')]|[?numberOfCores<=\`32\`]")
         for machine in all_machines:
             for cpu, mem in zip(cpu_list, min_mem):
                 ins = AzureInstance(machine=machine, name=machine['name'], cpu=cpu, mem=mem)

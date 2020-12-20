@@ -245,7 +245,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return pool
 
     def select_latest_verified_vm_image_with_node_agent_sku(
-            self, publisher='Canonical', offer='UbuntuServer', sku_starts_with='16.04'):
+            self, publisher='Canonical', offer='UbuntuServer', sku_starts_with='18.04'):
         """Select the latest verified image that Azure Batch supports given
         a publisher, offer and sku (starts with filter).
         :param batch_client: The batch client to use.
