@@ -3,9 +3,9 @@ import csv
 import sys
 import tempfile
 from collections import defaultdict
-from .scheduler import *
-from .hummingbird_utils import *
-from .instance import *
+from scheduler import *
+from hummingbird_utils import *
+from instance import *
 
 class Downsample(object):
     """Generate subsamples for input data.
@@ -225,9 +225,9 @@ class Downsample(object):
 
         ds_script.seek(0)
         machine = AWSInstance('r4.xlarge')
-        scheduler = BatchScheduler(self.conf, machine, 200, ds_script.name)
+        scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name)
         jobname = scheduler.submit_job()
-        BatchScheduler.wait_jobs([jobname])
+        AWSBatchScheduler.wait_jobs([jobname])
         return downsampled
 
     def downsample_by_type_azure(self, key_file_dict, type):
@@ -282,6 +282,6 @@ class Downsample(object):
         ds_script.seek(0)
         machine = AzureInstance()
         scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name)
-        jobname = scheduler.submit_job()
-        scheduler.wait_for_tasks_to_complete([jobname])
+        job_id = scheduler.submit_job()
+        scheduler.wait_for_tasks_to_complete([job_id])
         return downsampled

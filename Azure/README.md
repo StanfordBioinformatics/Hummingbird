@@ -34,4 +34,4 @@ WORKDIR /tmp
 
 ENTRYPOINT ["/usr/local/bin/fetch_and_run.sh"]
 ```
-Copy `fetch_and_run.sh` to the image and set it as the entrypoint for your docker image. `fetch_and_run.sh` script is essentially a helper script that fetch user's application script and execute it in the container. The original repo is available as https://github.com/awslabs/aws-batch-helpers/blob/master/fetch-and-run/fetch_and_run.sh.
+Copy `fetch_and_run.sh` to the image and set it as the entrypoint for your docker image. `fetch_and_run.sh` script is essentially a helper script that fetch user's application script and execute it in the container.
