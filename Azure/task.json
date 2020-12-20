@@ -1,10 +1,11 @@
 [
   {
-    "image": "",
+    "image": "amiralavi/hummingbird-azure:latest",
     "commandLine": "/bin/bash -c '/usr/local/bin/fetch_and_run.sh'",
     "constraints": {
       "maxWallClockTime": "P1D",
-      "maxTaskRetryCount": 1
+      "maxTaskRetryCount": 1,
+      "retentionTime": "P1D"
     },
     "environmentSettings": []
   }
