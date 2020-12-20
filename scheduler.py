@@ -1,3 +1,6 @@
+import sys
+from datetime import datetime
+
 try:
     from email import encoders
     from email.MIMEMultipart import MIMEMultipart
@@ -42,7 +45,8 @@ class Scheduler(object):
         logging.debug(self.cmd)
         return subprocess.Popen(self.cmd, shell=True)
 
-class BatchScheduler(object):
+
+class BaseBatchSchduler(object):
     job_def_name = 'hummingbird-job'
     compute_env_prefix = 'hummingbird-env-'
     startup_script_template = '''#cloud-boothook
@@ -50,12 +54,15 @@ class BatchScheduler(object):
 cloud-init-per once docker_options echo 'OPTIONS="$${OPTIONS} --storage-opt dm.basesize=$basesize"' >> /etc/sysconfig/docker
 '''
 
+
+class AWSBatchScheduler(BaseBatchSchduler):
     def __init__(self, conf, machine, disk_size, script):
         self.conf = conf
         self.machine = machine
         self.disk_size = disk_size
         self.script = script
         self.batch_client = boto3.client('batch')
+        super(AWSBatchScheduler, self).__init__()
 
     def update_laungch_template(self):
         basesize = str(self.disk_size) + 'G'
@@ -159,8 +166,206 @@ cloud-init-per once docker_options echo 'OPTIONS="$${OPTIONS} --storage-opt dm.b
                 break
             time.sleep(60)
 
+
+class AzureBatchScheduler(BaseBatchSchduler):
+    def __init__(self, conf, machine, disk_size, script):
+        self.conf = conf
+        self.machine = machine
+        self.disk_size = disk_size
+        self.script = script
+        self.image = 'xingziye/bwa-gatk:fetch_and_run'
+        self.batch_client = self._get_azure_batch_client(conf)
+        super(AzureBatchScheduler, self).__init__()
+
+    @staticmethod
+    def _get_azure_batch_client(conf):
+        from azure.batch import batch_auth, BatchServiceClient
+        creds = batch_auth.SharedKeyCredentials(conf[PLATFORM]['batch_account'], conf[PLATFORM]['batch_key'])
+        batch_url = f"https://{conf[PLATFORM]['batch_account']}.{conf[PLATFORM]['location']}.batch.azure.com"
+        return BatchServiceClient(creds, batch_url=batch_url)
+
+    def create_pool(self):
+        from azure.batch import models as batchmodels
+
+        pool_id = self.compute_env_prefix + self.machine.name + '-' + str(self.disk_size)
+
+        pool = self.get_pool(pool_id)
+        if pool is not None:
+            return pool_id
+
+        sku_to_use, image_ref_to_use = self.select_latest_verified_vm_image_with_node_agent_sku()
+
+        container_conf = batchmodels.ContainerConfiguration(container_image_names=[self.image])
+
+        config = batchmodels.VirtualMachineConfiguration(
+            image_reference=image_ref_to_use,
+            node_agent_sku_id=sku_to_use,
+            data_disks=[batchmodels.DataDisk(disk_size_gb=self.disk_size, lun=0)],
+            container_conf=container_conf,
+        )
+
+        pool = batchmodels.PoolAddParameter(
+            id=pool_id,
+            display_name=pool_id,
+            virtual_machine_configuration=config,
+            vm_size=self.machine,
+            target_dedicated_nodes=1,
+        )
+        self.batch_client.pool.add(pool)
+
+        while self.get_pool(pool_id) is None:
+            time.sleep(1)
+
+        return pool_id
+
+    def get_pool(self, name):
+        from azure.batch.models import BatchErrorException
+        try:
+            pool = self.batch_client.pool.get(name)
+            if pool and getattr(pool, 'id') == name:
+                return pool
+        except BatchErrorException:
+            pool = None
+
+        return pool
+
+    def select_latest_verified_vm_image_with_node_agent_sku(
+            self, publisher='Canonical', offer='UbuntuServer', sku_starts_with='16.04'):
+        """Select the latest verified image that Azure Batch supports given
+        a publisher, offer and sku (starts with filter).
+        :param batch_client: The batch client to use.
+        :type batch_client: `batchserviceclient.BatchServiceClient`
+        :param str publisher: vm image publisher
+        :param str offer: vm image offer
+        :param str sku_starts_with: vm sku starts with filter
+        :rtype: tuple
+        :return: (node agent sku id to use, vm image ref to use)
+        """
+        # get verified vm image list and node agent sku ids from service
+        from azure.batch import models as batchmodels
+
+        options = batchmodels.AccountListSupportedImagesOptions(filter="verificationType eq 'verified'")
+        images = self.batch_client.account.list_supported_images(account_list_supported_images_options=options)
+
+        # pick the latest supported sku
+        skus_to_use = [
+            (image.node_agent_sku_id, image.image_reference) for image in images
+            if image.image_reference.publisher.lower() == publisher.lower() and
+               image.image_reference.offer.lower() == offer.lower() and
+               image.image_reference.sku.startswith(sku_starts_with)
+        ]
+
+        # pick first
+        agent_sku_id, image_ref_to_use = skus_to_use[0]
+        return agent_sku_id, image_ref_to_use
+
+    def create_job(self, pool_id):
+        from azure.batch import models as batchmodels
+
+        job_queue_name = pool_id + '-queue'
+        job = batchmodels.JobAddParameter(
+            id=job_queue_name,
+            pool_info=batchmodels.PoolInformation(pool_id=pool_id)
+        )
+
+        try:
+            self.batch_client.job.add(job)
+        except batchmodels.batch_error.BatchErrorException as err:
+            print(err)
+            if err.error.code != "JobExists":
+                raise
+            else:
+                print("Job {!r} already exists".format(job_queue_name))
+
+        return job_queue_name
+
+    def add_task(self, job_id):
+        """
+        Adds a task for each input file in the collection to the specified job.
+        :param str job_id: The ID of the job to which to add the tasks.
+        :param list input_files: A collection of input files. One task will be
+         created for each input file.
+        :param output_container_sas_token: A SAS token granting write access to
+        the specified Azure Blob storage container.
+        """
+        from azure.batch import models as batchmodels
+
+        task_id = os.path.basename(self.script)
+
+        print('Adding {} tasks to job [{}]...'.format(task_id, job_id))
+
+        container_settings = batchmodels.TaskContainerSettings(
+            image_name=self.image,
+            container_run_options='--rm'
+        )
+        task = batchmodels.TaskAddParameter(
+            id=task_id,
+            command_line='/bin/sh -c ""',
+            container_settings=container_settings,
+        )
+        return task
+
+    def wait_for_tasks_to_complete(self, jobs, timeout=900):
+        """
+        Returns when all tasks in the specified job reach the Completed state.
+        :param str jibs: The id of the jobs whose tasks should be monitored.
+        :param timedelta timeout: The duration to wait for task completion. If all
+        tasks in the specified job do not reach Completed state within this time
+        period, an exception will be raised.
+        """
+        from azure.batch import models as batchmodels
+
+        timeout_expiration = datetime.now() + timeout
+
+        print("Monitoring all tasks for 'Completed' state, timeout in {}...".format(timeout), end='')
+
+        while datetime.now() < timeout_expiration:
+            for job_id in jobs:
+                print('.', end='')
+                sys.stdout.flush()
+                tasks = self.batch_client.task.list(job_id)
+
+                incomplete_tasks = [task for task in tasks if
+                                    task.state != batchmodels.TaskState.completed]
+                if not incomplete_tasks:
+                    print()
+                    return True
+                else:
+                    time.sleep(1)
+
+        print()
+        raise RuntimeError("ERROR: Tasks did not reach 'Completed' state within "
+                           "timeout period of " + str(timeout))
+
+    def submit_job(self, tries=1):
+        pool_id = self.create_pool()
+        job_id = self.create_job(pool_id)
+        tasks = self.add_task(job_id)
+        print(tasks)
+
+        jobname = os.path.basename(self.script)
+        s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'
+        subprocess.call(['aws', 's3', 'cp', self.script, s3_path])
+        data = dict()
+        data['vcpus'] = self.machine.cpu
+        data['memory'] = int(self.machine.mem * 1024 * 0.9)
+        data['command'] = [jobname + '.sh']
+        data['environment'] = [{"name": "BATCH_FILE_TYPE", "value": "script"},
+                               {"name": "BATCH_FILE_S3_URL", "value": s3_path}]
+        arguments = ['aws', 'batch', 'submit-job', '--job-name', jobname,
+                     '--job-queue', job_queue_name,
+                     '--job-definition', self.job_def_name,
+                     '--container-overrides', json.dumps(data)]
+        if tries > 1:
+            array_properties = {"size": tries}
+            arguments += ['--array-properties', json.dumps(array_properties)]
+        output = subprocess.check_output(arguments)
+        desc_json = json.loads(output)
+        return desc_json['jobId']
+
+
 if __name__ == "__main__":
-    ins = AWS_Instance('r4.xlarge')
-    scheduler = BatchScheduler(ins, 75, "s3://")
+    ins = AWSInstance('r4.xlarge')
+    scheduler = AWSBatchScheduler(ins, 75, "s3://")
     scheduler.update_job_queue(scheduler.create_compute_environment())
     scheduler.reg_job_def()

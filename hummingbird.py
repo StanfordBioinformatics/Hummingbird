@@ -12,6 +12,7 @@ from profiler import Profiler
 from instance import *
 from hummingbird_utils import *
 
+
 def main():
     """The main pipeline."""
     parser = argparse.ArgumentParser()
@@ -50,10 +51,7 @@ def main():
 
         logging.info('Preparing memory profiling...')
         logging.info(pformat(ds_dict))
-        wf_conf = {}
-        wf_conf[PROFILING] = workflow
-        wf_conf[DOWNSAMPLE] = config[DOWNSAMPLE]
-        wf_conf[PLATFORM] = config[PLATFORM]
+        wf_conf = {PROFILING: workflow, DOWNSAMPLE: config[DOWNSAMPLE], PLATFORM: config[PLATFORM]}
         profiler = Profiler(backend, args.profile_tool, Profiler.mem_mode, wf_conf)
         profiling_dict = profiler.profile(ds_dict)
         logging.info('Memory profiling done.')
@@ -92,11 +90,11 @@ def main():
             cus_types = []
             # for i, t in enumerate(thread_list):
                 # print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
-                # cus_types.append(GCP_Instance(cpu=t, mem=math.ceil(min_mem[i])))
+                # cus_types.append(GCPInstance(cpu=t, mem=math.ceil(min_mem[i])))
             while True:
                 ins_name = input('instance types:')
                 if ins_name:
-                    cus_types.append(GCP_Instance(name=ins_name))
+                    cus_types.append(GCPInstance(name=ins_name))
                 else:
                     break
             for ins in cus_types:
@@ -143,6 +141,7 @@ def main():
                 break
             multiplier *= 10
             ds_size = int(target * Downsample.runtime_frac * multiplier)
+
 
 if __name__ == "__main__":
     main()

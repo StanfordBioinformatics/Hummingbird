@@ -103,6 +103,7 @@ def regression(known_data, target_value, filename='plot/hummingbird.png'):
     plt.savefig(filename)
     return result
 
+
 class Predictor(object):
     def __init__(self, target, threads):
         self.target = target
@@ -120,16 +121,19 @@ class Predictor(object):
         # Reshape data using array.reshape(-1, 1) if your data has a single feature
         target = np.array(self.target).reshape(-1, 1)
         target_log = np.log(target)
+
         def compute_model(x, y, target):
             regr = linear_model.LinearRegression()
             regr.fit(x, y)
             r2 = regr.score(x, y)
             pred = max(np.max(y), np.asscalar(regr.predict(target)))
             return (pred, r2)
+
         for i, y in enumerate(ys):
             pred, r2 = compute_model(x, y, target)
             pred_log, r2_log = compute_model(x_log, y, target_log)
             print('prediction:', pred, pred_log)
             print('R2:', r2, r2_log)
             predictions.append(pred_log)
+
         return predictions
