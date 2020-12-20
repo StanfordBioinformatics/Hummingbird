@@ -4,17 +4,21 @@ import json
 import subprocess
 import sqlite3
 
+
 class Instance:
     @staticmethod
     def get_machine_types(conf, min_mem):
         service = conf['Platform']['service']
         service = service.lower()
-        region = conf['Platform']['regions']
         cpu_list = conf['Profiling'].get('thread', [4])
-        if service == 'google' or service == 'gcp':
-            return GCP_Instance.get_machine_types(region, cpu_list, min_mem)
+        if service in ['google', 'gcp']:
+            region = conf['Platform']['regions']
+            return GCPInstance.get_machine_types(region, cpu_list, min_mem)
         elif service == 'aws':
-            return AWS_Instance.get_machine_types(['r4', 'r5'], cpu_list, min_mem)
+            return AWSInstance.get_machine_types(['r4', 'r5'], cpu_list, min_mem)
+        elif service in ['azure', 'az']:
+            location = conf['Platform']['location']
+            return AzureInstance.get_machine_types(location, cpu_list, min_mem)
 
     def __init__(self, name, cpu, mem):
         self.name = name
@@ -43,27 +47,27 @@ class Instance:
     def get_core(self):
         return str(self.cpu)
 
-class GCP_Instance(Instance):
+class GCPInstance(Instance):
     pricing = {
-    'n1-standard-1': 0.0475,
-    'n1-standard-2': 0.0950,
-    'n1-standard-4': 0.1900,
-    'n1-standard-8': 0.3800,
-    'n1-standard-16': 0.7600,
-    'n1-standard-32': 1.5200,
-    'n1-standard-64': 3.0400,
-    'n1-highmem-2': 0.1184,
-    'n1-highmem-4': 0.2368,
-    'n1-highmem-8': 0.4736,
-    'n1-highmem-16': 0.9472,
-    'n1-highmem-32': 1.8944,
-    'n1-highmem-64': 3.7888,
-    'n1-highcpu-2': 0.0709,
-    'n1-highcpu-4': 0.1418,
-    'n1-highcpu-8': 0.2836,
-    'n1-highcpu-16': 0.5672,
-    'n1-highcpu-32': 1.1344,
-    'n1-highcpu-64': 2.2688
+        'n1-standard-1': 0.0475,
+        'n1-standard-2': 0.0950,
+        'n1-standard-4': 0.1900,
+        'n1-standard-8': 0.3800,
+        'n1-standard-16': 0.7600,
+        'n1-standard-32': 1.5200,
+        'n1-standard-64': 3.0400,
+        'n1-highmem-2': 0.1184,
+        'n1-highmem-4': 0.2368,
+        'n1-highmem-8': 0.4736,
+        'n1-highmem-16': 0.9472,
+        'n1-highmem-32': 1.8944,
+        'n1-highmem-64': 3.7888,
+        'n1-highcpu-2': 0.0709,
+        'n1-highcpu-4': 0.1418,
+        'n1-highcpu-8': 0.2836,
+        'n1-highcpu-16': 0.5672,
+        'n1-highcpu-32': 1.1344,
+        'n1-highcpu-64': 2.2688
     }
 
     @staticmethod
@@ -89,21 +93,21 @@ AND CPUS = ? '''
             cur.execute(SQL, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
-                valid.append(GCP_Instance(entry[0], entry[1], entry[2]))
+                valid.append(GCPInstance(entry[0], entry[1], entry[2]))
         SQL = SQL.replace('>=', '<')
         for cpu, mem in zip(cpu_list, min_mem):
             cur.execute(SQL, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
-                invalid.append(GCP_Instance(entry[0], entry[1], entry[2]))
+                invalid.append(GCPInstance(entry[0], entry[1], entry[2]))
         conn.close()
         return valid, invalid
 
     def set_price(self, price=None):
         if price:
             self.price = price
-        elif self.name in GCP_Instance.pricing:
-            self.price = GCP_Instance.pricing[self.name]
+        elif self.name in GCPInstance.pricing:
+            self.price = GCPInstance.pricing[self.name]
         else:
             raise Exception('Fail to set price.')
 
@@ -124,7 +128,8 @@ AND CPUS = ? '''
         else:
             Instance.__init__(self, 'custom', cpu, mem)
 
-class AWS_Instance(Instance):
+
+class AWSInstance(Instance):
     thread_suffix = {2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge'}
     pricing = {'r4.large': 0.133,
                'r4.xlarge': 0.266,
@@ -142,7 +147,7 @@ class AWS_Instance(Instance):
         if name is None and (cpu is None or mem is None):
             Instance.__init__(self, 't2.micro', 1, 1)
         elif name:
-            vcpu, mem = AWS_Instance.desc_instance(name)
+            vcpu, mem = AWSInstance.desc_instance(name)
             Instance.__init__(self, name, vcpu, mem)
         else:
             Instance.__init__(self, 'custom', cpu, mem)
@@ -150,8 +155,8 @@ class AWS_Instance(Instance):
     def set_price(self, price=None):
         if price:
             self.price = price
-        elif self.name in AWS_Instance.pricing:
-            self.price = AWS_Instance.pricing[self.name]
+        elif self.name in AWSInstance.pricing:
+            self.price = AWSInstance.pricing[self.name]
         else:
             raise Exception('Fail to set price.')
 
@@ -166,13 +171,68 @@ class AWS_Instance(Instance):
         valid, invalid = [], []
         for family in families:
             for cpu, mem in zip(cpu_list, min_mem):
-                ins = AWS_Instance(family+AWS_Instance.thread_suffix[cpu])
+                ins = AWSInstance(family + AWSInstance.thread_suffix[cpu])
                 if ins.mem >= mem:
                     valid.append(ins)
                 else:
                     invalid.append(ins)
         return valid, invalid
 
-if __name__ == "__main__":
-    ins = AWS_Instance('t2.micro')
-    print(ins.mem)
+
+class AzureInstance(Instance):
+    pricing = {
+        'Standard_E2s_v3': 0.148,
+        'Standard_E4s_v3': 0.296,
+        'Standard_E8s_v3': 0.56,
+        'Standard_E16s_v3': 1.12,
+        'Standard_E20s_v3': 1.48,
+        'Standard_E32s_v3': 2.24,
+    }
+
+    def __init__(self, machine=None, name=None, cpu=None, mem=None):
+        if name is None:
+            if not mem:
+                mem = 16
+            if not cpu:
+                cpu = 2
+            super(AzureInstance, self).__init__(self, 'Standard_E2s_v3', cpu, mem)
+        elif machine:
+            vcpu, mem = self.get_machine_specs(machine)
+            super(AzureInstance, self).__init__(self, name, vcpu, mem)
+        elif name:
+            vcpu, mem = self.desc_instance(name)
+            super(AzureInstance, self).__init__(self, name, vcpu, mem)
+
+    def set_price(self, price=None):
+        if price:
+            self.price = price
+        elif self.name in self.pricing:
+            self.price = self.pricing[self.name]
+        else:
+            raise Exception('Fail to set price.')
+
+    def desc_instance(self, name, region):
+        desc = self.filter_matchines(region, f"[?name=='{name}']")[0]
+        return self.get_machine_specs(desc)
+
+    @staticmethod
+    def get_machine_specs(machine):
+        return int(machine['numberOfCores']), int(machine['memoryInMb']) / 1024
+
+    @staticmethod
+    def get_machine_types(location, cpu_list, min_mem):
+        valid, invalid = [], []
+        all_machines = AzureInstance.filter_matchines(location, "[?starts_with(name, 'Standard_E')]|[?ends_with(name, 's_v4')]|[?numberOfCores<=\`32\`]")
+        for machine in all_machines:
+            for cpu, mem in zip(cpu_list, min_mem):
+                ins = AzureInstance(machine=machine, name=machine['name'], cpu=cpu, mem=mem)
+                if ins.mem >= mem:
+                    valid.append(ins)
+                else:
+                    invalid.append(ins)
+        return valid, invalid
+
+    @staticmethod
+    def filter_matchines(location, query):
+        output = subprocess.check_output(['az', 'vm', 'list-sizes', '--location', location, '--query', query])
+        return json.loads(output)

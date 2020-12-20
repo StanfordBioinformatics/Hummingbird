@@ -1,0 +1,12 @@
+[
+  {
+    "id": "hummingbird",
+    "displayName": "hummingbird",
+    "commandLine": "/bin/bash -c '/tmp/entrypoint.sh'",
+    "constraints": {
+      "maxWallClockTime": "P1D",
+      "maxTaskRetryCount": 1
+    },
+    "environmentSettings": []
+  }
+]

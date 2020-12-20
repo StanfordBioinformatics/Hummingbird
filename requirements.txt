@@ -7,3 +7,6 @@ matplotlib
 scikit-learn
 google-cloud-storage
 boto3
+azure-storage-blob==12.6.0
+azure-identity==1.5.0
+azure-batch==10.0.0
