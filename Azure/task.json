@@ -1,8 +1,7 @@
 [
   {
-    "id": "hummingbird",
-    "displayName": "hummingbird",
-    "commandLine": "/bin/bash -c '/tmp/entrypoint.sh'",
+    "image": "",
+    "commandLine": "/bin/bash -c '/usr/local/bin/fetch_and_run.sh'",
     "constraints": {
       "maxWallClockTime": "P1D",
       "maxTaskRetryCount": 1

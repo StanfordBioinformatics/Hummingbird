@@ -13,9 +13,9 @@ try:
 except ImportError:
     from urllib.parse import unquote  # python3
 
-from .instance import *
-from .scheduler import *
-from .hummingbird_utils import *
+from instance import *
+from scheduler import *
+from hummingbird_utils import *
 
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
 DEFAULT_THREAD = 8
@@ -50,7 +50,7 @@ class Profiler(object):
         elif self.service == 'azure':
             from azure.storage.blob import BlobServiceClient
             self.client = BlobServiceClient.from_connection_string(conf[PLATFORM]['storage_connection_string'])
-            self.container_client = self.client(container=conf[PLATFORM]['storage_container'])
+            self.container_client = self.client.get_container_client(container=conf[PLATFORM]['storage_container'])
         self.output_dict = None
 
     def _set_profiler(self, conf):

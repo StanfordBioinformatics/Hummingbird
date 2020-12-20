@@ -173,8 +173,11 @@ class AzureBatchScheduler(BaseBatchSchduler):
         self.machine = machine
         self.disk_size = disk_size
         self.script = script
-        self.image = 'xingziye/bwa-gatk:fetch_and_run'
+        self.script_target_name = os.path.basename(self.script) + '.sh'
+        self.task_definition = self.__get_task_definition()
+        self.image = self.task_definition['image']
         self.batch_client = self._get_azure_batch_client(conf)
+        self.container_client = self._get_azure_container_client(conf)
         super(AzureBatchScheduler, self).__init__()
 
     @staticmethod
@@ -183,6 +186,18 @@ class AzureBatchScheduler(BaseBatchSchduler):
         creds = batch_auth.SharedKeyCredentials(conf[PLATFORM]['batch_account'], conf[PLATFORM]['batch_key'])
         batch_url = f"https://{conf[PLATFORM]['batch_account']}.{conf[PLATFORM]['location']}.batch.azure.com"
         return BatchServiceClient(creds, batch_url=batch_url)
+
+    @staticmethod
+    def _get_azure_container_client(conf):
+        from azure.storage.blob import BlobServiceClient
+        client = BlobServiceClient.from_connection_string(conf[PLATFORM]['storage_connection_string'])
+        container_client = client.get_container_client(container=conf[PLATFORM]['storage_container'])
+        return container_client
+
+    @staticmethod
+    def _get_task_definition():
+        with open('./Azure/task.json') as task:
+            return json.dumps(task)
 
     def create_pool(self):
         from azure.batch import models as batchmodels
@@ -277,16 +292,14 @@ class AzureBatchScheduler(BaseBatchSchduler):
             else:
                 print("Job {!r} already exists".format(job_queue_name))
 
-        return job_queue_name
+        return job
 
-    def add_task(self, job_id):
+    def add_task(self, job_id, default_max_tries=None):
         """
         Adds a task for each input file in the collection to the specified job.
         :param str job_id: The ID of the job to which to add the tasks.
-        :param list input_files: A collection of input files. One task will be
          created for each input file.
-        :param output_container_sas_token: A SAS token granting write access to
-        the specified Azure Blob storage container.
+        :output task: Azure Batch task
         """
         from azure.batch import models as batchmodels
 
@@ -298,14 +311,39 @@ class AzureBatchScheduler(BaseBatchSchduler):
             image_name=self.image,
             container_run_options='--rm'
         )
+
+        platform = self.conf[PLATFORM]
+        environment_settings = [
+            batchmodels.EnvironmentSetting(name='AZURE_SUBSCRIPTION_ID', value=platform['subscription']),
+            batchmodels.EnvironmentSetting(name='AZURE_STORAGE_ACCOUNT', value=platform['storage_account']),
+            batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONTAINER', value=platform['storage_container']),
+            batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONNECTION_STRING', value=platform['storage_connection_string']),
+            batchmodels.EnvironmentSetting(name='DESTINATION_PATH', value=self.script_target_name),
+        ]
+
+        constraints = None
+        if 'constraints' in self.task_definition and self.task_definition['constraints']:
+            constraints = batchmodels.TaskConstraints(
+                max_wall_clock_time=self.task_definition['constraints'].get('maxWallClockTime', None),
+                max_task_retry_count=self.task_definition['constraints'].get('maxTaskRetryCount', default_max_tries),
+            ),
+
         task = batchmodels.TaskAddParameter(
             id=task_id,
-            command_line='/bin/sh -c ""',
+            display_name=task_id,
+            command_line=self.task_definition['commandLine'],
+            constraints=constraints,
             container_settings=container_settings,
+            environment_settings=environment_settings
         )
+
+        validation_results = task.validate()
+        for validation in validation_results:
+            print(validation)
+
         return task
 
-    def wait_for_tasks_to_complete(self, jobs, timeout=900):
+    def wait_for_tasks_to_complete(self, job_ids, timeout=900):
         """
         Returns when all tasks in the specified job reach the Completed state.
         :param str jibs: The id of the jobs whose tasks should be monitored.
@@ -320,7 +358,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         print("Monitoring all tasks for 'Completed' state, timeout in {}...".format(timeout), end='')
 
         while datetime.now() < timeout_expiration:
-            for job_id in jobs:
+            for job_id in job_ids:
                 print('.', end='')
                 sys.stdout.flush()
                 tasks = self.batch_client.task.list(job_id)
@@ -337,31 +375,19 @@ class AzureBatchScheduler(BaseBatchSchduler):
         raise RuntimeError("ERROR: Tasks did not reach 'Completed' state within "
                            "timeout period of " + str(timeout))
 
+    def upload_script(self):
+        with open(self.script, "rb") as data:
+            self.container_client.upload_blob(
+                name=self.script_target_name,
+                data=data,
+            )
+
     def submit_job(self, tries=1):
         pool_id = self.create_pool()
-        job_id = self.create_job(pool_id)
-        tasks = self.add_task(job_id)
-        print(tasks)
-
-        jobname = os.path.basename(self.script)
-        s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'
-        subprocess.call(['aws', 's3', 'cp', self.script, s3_path])
-        data = dict()
-        data['vcpus'] = self.machine.cpu
-        data['memory'] = int(self.machine.mem * 1024 * 0.9)
-        data['command'] = [jobname + '.sh']
-        data['environment'] = [{"name": "BATCH_FILE_TYPE", "value": "script"},
-                               {"name": "BATCH_FILE_S3_URL", "value": s3_path}]
-        arguments = ['aws', 'batch', 'submit-job', '--job-name', jobname,
-                     '--job-queue', job_queue_name,
-                     '--job-definition', self.job_def_name,
-                     '--container-overrides', json.dumps(data)]
-        if tries > 1:
-            array_properties = {"size": tries}
-            arguments += ['--array-properties', json.dumps(array_properties)]
-        output = subprocess.check_output(arguments)
-        desc_json = json.loads(output)
-        return desc_json['jobId']
+        job = self.create_job(pool_id)
+        self.upload_script()
+        self.add_task(job.id, default_max_tries=tries)
+        return job.id
 
 
 if __name__ == "__main__":
