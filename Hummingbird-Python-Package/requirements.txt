@@ -1,0 +1,9 @@
+dsub==0.3.6
+future
+configparser
+numpy
+scipy
+matplotlib
+scikit-learn
+google-cloud-storage
+boto3
