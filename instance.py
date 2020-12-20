@@ -195,13 +195,13 @@ class AzureInstance(Instance):
                 mem = 16
             if not cpu:
                 cpu = 2
-            super(AzureInstance, self).__init__(self, 'Standard_E2s_v3', cpu, mem)
+            super(AzureInstance, self).__init__('Standard_E2s_v3', cpu, mem)
         elif machine:
             vcpu, mem = self.get_machine_specs(machine)
-            super(AzureInstance, self).__init__(self, name, vcpu, mem)
+            super(AzureInstance, self).__init__(name, vcpu, mem)
         elif name:
             vcpu, mem = self.desc_instance(name)
-            super(AzureInstance, self).__init__(self, name, vcpu, mem)
+            super(AzureInstance, self).__init__(name, vcpu, mem)
 
     def set_price(self, price=None):
         if price:

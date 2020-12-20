@@ -1,5 +1,5 @@
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     from email import encoders
@@ -174,7 +174,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         self.disk_size = disk_size
         self.script = script
         self.script_target_name = os.path.basename(self.script) + '.sh'
-        self.task_definition = self.__get_task_definition()
+        self.task_definition = self._get_task_definition()
         self.image = self.task_definition['image']
         self.batch_client = self._get_azure_batch_client(conf)
         self.container_client = self._get_azure_container_client(conf)
@@ -197,7 +197,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
     @staticmethod
     def _get_task_definition():
         with open('./Azure/task.json') as task:
-            return json.dumps(task)
+            return json.load(task)[0]
 
     def create_pool(self):
         from azure.batch import models as batchmodels
@@ -280,13 +280,13 @@ class AzureBatchScheduler(BaseBatchSchduler):
         job_queue_name = pool_id + '-queue'
         job = batchmodels.JobAddParameter(
             id=job_queue_name,
+            display_name=job_queue_name,
             pool_info=batchmodels.PoolInformation(pool_id=pool_id)
         )
 
         try:
             self.batch_client.job.add(job)
-        except batchmodels.batch_error.BatchErrorException as err:
-            print(err)
+        except batchmodels.BatchErrorException as err:
             if err.error.code != "JobExists":
                 raise
             else:
@@ -299,6 +299,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         Adds a task for each input file in the collection to the specified job.
         :param str job_id: The ID of the job to which to add the tasks.
          created for each input file.
+        :param int default_max_tries: Fallback max tries.
         :output task: Azure Batch task
         """
         from azure.batch import models as batchmodels
@@ -324,26 +325,28 @@ class AzureBatchScheduler(BaseBatchSchduler):
         constraints = None
         if 'constraints' in self.task_definition and self.task_definition['constraints']:
             constraints = batchmodels.TaskConstraints(
-                max_wall_clock_time=self.task_definition['constraints'].get('maxWallClockTime', None),
+                max_wall_clock_time=self.task_definition['constraints'].get('maxWallClockTime', "P1D"),
                 max_task_retry_count=self.task_definition['constraints'].get('maxTaskRetryCount', default_max_tries),
+                retention_time=self.task_definition['constraints'].get('retentionTime', "P1D"),
             ),
 
         task = batchmodels.TaskAddParameter(
             id=task_id,
             display_name=task_id,
             command_line=self.task_definition['commandLine'],
-            constraints=constraints,
+            constraints=constraints[0],
             container_settings=container_settings,
             environment_settings=environment_settings
         )
 
-        validation_results = task.validate()
-        for validation in validation_results:
+        for validation in task.validate():
             print(validation)
+
+        self.batch_client.task.add(job_id=job_id, task=task)
 
         return task
 
-    def wait_for_tasks_to_complete(self, job_ids, timeout=900):
+    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(minutes=30)):
         """
         Returns when all tasks in the specified job reach the Completed state.
         :param str jibs: The id of the jobs whose tasks should be monitored.
