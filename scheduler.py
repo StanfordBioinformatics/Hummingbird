@@ -1,6 +1,8 @@
 import sys
 from datetime import datetime, timedelta
 
+from retry import retry
+
 try:
     from email import encoders
     from email.MIMEMultipart import MIMEMultipart
@@ -199,6 +201,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         with open('./Azure/task.json') as task:
             return json.load(task)[0]
 
+    @retry(tries=3, delay=1)
     def create_pool(self):
         from azure.batch import models as batchmodels
 
@@ -224,8 +227,13 @@ class AzureBatchScheduler(BaseBatchSchduler):
             display_name=pool_id,
             virtual_machine_configuration=config,
             vm_size=self.machine,
-            target_dedicated_nodes=1,
         )
+
+        if self.conf[PLATFORM].get('low_priority', False):
+            pool.target_low_priority_nodes = 1
+        else:
+            pool.target_dedicated_nodes = 1
+
         self.batch_client.pool.add(pool)
 
         while self.get_pool(pool_id) is None:
@@ -233,6 +241,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return pool_id
 
+    @retry(tries=3, delay=1)
     def get_pool(self, name):
         from azure.batch.models import BatchErrorException
         try:
@@ -244,6 +253,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return pool
 
+    @retry(tries=3, delay=1)
     def select_latest_verified_vm_image_with_node_agent_sku(
             self, publisher='microsoft-azure-batch', offer='ubuntu-server-container', sku_starts_with='16-04'):
         """Select the latest verified image that Azure Batch supports given
@@ -274,6 +284,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         agent_sku_id, image_ref_to_use = skus_to_use[0]
         return agent_sku_id, image_ref_to_use
 
+    @retry(tries=3, delay=1)
     def create_job(self, pool_id):
         from azure.batch import models as batchmodels
 
@@ -294,6 +305,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return job
 
+    @retry(tries=3, delay=1)
     def add_task(self, job_id, default_max_tries=None):
         """
         Adds a task for each input file in the collection to the specified job.
@@ -354,6 +366,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return task
 
+    @retry(tries=3, delay=1)
     def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=8)):
         """
         Returns when all tasks in the specified job reach the Completed state.
@@ -386,6 +399,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         raise RuntimeError("ERROR: Tasks did not reach 'Completed' state within "
                            "timeout period of " + str(timeout))
 
+    @retry(tries=3, delay=1)
     def upload_script(self):
         with open(self.script, "rb") as data:
             self.container_client.upload_blob(

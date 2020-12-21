@@ -4,6 +4,8 @@ import json
 import subprocess
 import sqlite3
 
+from retry import retry
+
 
 class Instance:
     @staticmethod
@@ -237,6 +239,7 @@ class AzureInstance(Instance):
         return valid, invalid
 
     @staticmethod
+    @retry(tries=3, delay=1)
     def filter_machines(conf, location, machine_names):
         from azure.identity import AzureCliCredential
         from azure.mgmt.compute import ComputeManagementClient
