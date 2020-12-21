@@ -8,6 +8,9 @@ import time
 from collections import defaultdict
 from multiprocessing import Pool
 from string import Template
+
+from retry import retry
+
 try:
     from urllib import unquote  # python2
 except ImportError:
@@ -105,11 +108,14 @@ class Profiler(object):
                         for task in tasks:
                             path = os.path.join(dir_prefix, 'try' + task + '.txt')
                             blob_client = self.client.get_blob_client(container=container_name, blob=path)
-                            value = self.get_azure_blob_value(blob_client)
-                            if value:
+
+                            from azure.core.exceptions import ResourceNotFoundError
+                            try:
+                                value = self.get_azure_blob_value(blob_client)
                                 value = json.loads(value)
-                                print(total, value)
                                 total += value
+                            except ResourceNotFoundError:
+                                pass
 
                         profiling_dict['script'][entry_count].append(total / len(tasks))
             return profiling_dict
@@ -160,16 +166,9 @@ class Profiler(object):
                         print(taskname, entry_count, res_set)
         return profiling_dict
 
-    def get_azure_blob_value(self, blob_client, retry_count=0):
-        if retry_count >= 10:
-            return
-
-        from azure.core.exceptions import ResourceNotFoundError
-        try:
-            return blob_client.download_blob().readall()
-        except ResourceNotFoundError:
-            time.sleep(1)
-            return self.get_azure_blob_value(blob_client, retry_count + 1)
+    @retry(tries=10, delay=1, max_delay=10, backoff=2)
+    def get_azure_blob_value(self, blob_client):
+        return blob_client.download_blob().readall()
 
     def aws_batch_profile(self, input_dict, machines):
         if machines is None: # do nothing with empty list
