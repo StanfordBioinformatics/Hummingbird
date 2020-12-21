@@ -5,15 +5,16 @@ import os
 import shutil
 import tempfile
 import time
-import boto3
 from collections import defaultdict
-from google.cloud import storage
 from multiprocessing import Pool
 from string import Template
+
+from retry import retry
+
 try:
-    from urllib import unquote # python2
+    from urllib import unquote  # python2
 except ImportError:
-    from urllib.parse import unquote # python3
+    from urllib.parse import unquote  # python3
 
 from instance import *
 from scheduler import *
@@ -21,6 +22,7 @@ from hummingbird_utils import *
 
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
 DEFAULT_THREAD = 8
+
 
 class Profiler(object):
     """Profile and collect the results for subsampled input data.
@@ -43,9 +45,18 @@ class Profiler(object):
         self.conf = conf
         self.service = conf[PLATFORM]['service']
         if self.service == 'aws':
+            import boto3
             self.client = boto3.client('s3')
         elif self.service == 'gcp':
+            from google.cloud import storage
             self.client = storage.Client(project=conf[PLATFORM]['project'])
+        elif self.service == 'azure':
+            import logging
+            logger = logging.getLogger('azure')
+            logger.setLevel(logging.WARNING)
+            from azure.storage.blob import BlobServiceClient
+            self.client = BlobServiceClient.from_connection_string(conf[PLATFORM]['storage_connection_string'])
+            self.container_client = self.client.get_container_client(container=conf[PLATFORM]['storage_container'])
         self.output_dict = None
 
     def _set_profiler(self, conf):
@@ -70,7 +81,7 @@ class Profiler(object):
         if self.service == 'aws':
             profiling_dict = dict()
             profiling_dict['script'] = defaultdict(list)
-            result_dict = self.batch_profile(input_dict, machines)
+            result_dict = self.aws_batch_profile(input_dict, machines)
             bucket_name = self.conf[PLATFORM]['bucket']
             tries = self.conf[PROFILING].get('tries', 1)
             for entry_count in result_dict:
@@ -84,13 +95,37 @@ class Profiler(object):
                         total += value
                     profiling_dict['script'][entry_count].append(total/tries)
             return profiling_dict
+        elif self.service == 'azure':
+            profiling_dict = dict()
+            profiling_dict['script'] = defaultdict(list)
+            result_dict, tasks = self.az_batch_profile(input_dict, machines)
+            container_name = self.conf[PLATFORM]['storage_container']
+            if tasks:
+                for entry_count in result_dict:
+                    dir_list = result_dict[entry_count]
+                    for dir_prefix in dir_list:
+                        total = 0.0
+                        for task in tasks:
+                            path = os.path.join(dir_prefix, 'try' + task + '.txt')
+                            blob_client = self.client.get_blob_client(container=container_name, blob=path)
+
+                            from azure.core.exceptions import ResourceNotFoundError
+                            try:
+                                value = self.get_azure_blob_value(blob_client)
+                                value = json.loads(value)
+                                total += value
+                            except ResourceNotFoundError:
+                                pass
+
+                        profiling_dict['script'][entry_count].append(total / len(tasks))
+            return profiling_dict
 
         if machines is None: # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
                 #thread = thread.strip()
-                machines.append(GCP_Instance(MACHINE_TYPE_PREFIX + str(thread)))
+                machines.append(GCPInstance(MACHINE_TYPE_PREFIX + str(thread)))
         tries = self.conf[PROFILING].get('tries', 1)
         if tries > 1:
             # Apply parallel processing
@@ -131,13 +166,17 @@ class Profiler(object):
                         print(taskname, entry_count, res_set)
         return profiling_dict
 
-    def batch_profile(self, input_dict, machines):
+    @retry(tries=10, delay=1, max_delay=10, backoff=2)
+    def get_azure_blob_value(self, blob_client):
+        return blob_client.download_blob().readall()
+
+    def aws_batch_profile(self, input_dict, machines):
         if machines is None: # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
                 #thread = thread.strip()
-                machines.append(AWS_Instance('r5' + AWS_Instance.thread_suffix[thread]))
+                machines.append(AWSInstance('r5' + AWSInstance.thread_suffix[thread]))
         tries = self.conf[PROFILING].get('tries', 1)
 
         url_base = 's3://' + self.conf[PLATFORM]['bucket'] + '/'
@@ -220,21 +259,141 @@ class Profiler(object):
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
-                    scheduler = BatchScheduler(self.conf, machine, disk_size, job_script.name)
+                    scheduler = AWSBatchScheduler(self.conf, machine, disk_size, job_script.name)
                     job = scheduler.submit_job(tries)
                     jobs.append(job)
                     time.sleep(1)
             prev_mem = machine.mem
         if jobs:
-            BatchScheduler.wait_jobs(jobs)
+            AWSBatchScheduler.wait_jobs(jobs)
         self.output_dict = output_dict
         return result_dict
+
+    def az_batch_profile(self, input_dict, machines):
+        if machines is None:  # do nothing with empty list
+            machines = list()
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            for thread in thread_list:
+                machines.append(AzureInstance(self.conf, machine='Standard_E' + AWSInstance.thread_suffix[thread] + '_v3'))
+        tries = self.conf[PROFILING].get('tries', 1)
+
+        result_dict = defaultdict(list)
+        output_dict = defaultdict(dict)
+        prev_mem = 0  # used to get output from the largest instances
+        jobs = []
+        tasks = []
+
+        storage_account = self.conf[PLATFORM]['storage_account']
+        storage_container = self.conf[PLATFORM]['storage_container']
+        for machine in machines:
+            for entry_count in input_dict:
+                job_script = tempfile.NamedTemporaryFile(mode='w')
+                job_script.write('apt-get -qq update && apt-get -qqy install time\n')
+                local_name_dict = {'THREAD': machine.get_core()}
+                for input_key, key_space in input_dict[entry_count].items():
+                    local_name = os.path.basename(key_space)
+                    job_script.write(' '.join(['az', 'storage', 'blob', 'download',
+                                               '--container-name', storage_container, '--name', key_space,
+                                               '--file', local_name, '--account-name', storage_account]) + '\n')
+                    local_name_dict[input_key] = local_name
+                if 'input' in self.conf[PROFILING]:
+                    for key, path in self.conf[PROFILING]['input'].items():
+                        local_name_dict[key] = path
+                        job_script.write(' '.join(['az', 'storage', 'blob', 'download',
+                                                   '--container-name', storage_container, '--name', path, '--file', path,
+                                                   '--account-name', storage_account]) + '\n')
+                if 'input-recursive' in self.conf[PROFILING]:
+                    for key, path in self.conf[PROFILING]['input-recursive'].items():
+                        local_name_dict[key] = path
+                        job_script.write(' '.join(['mkdir', '-p', path]) + '\n')
+                        job_script.write(' '.join(['az', 'storage', 'blob', 'download-batch',
+                                                   '--source', storage_container, '--destination', '.',
+                                                   '--pattern', f'{path}/*',
+                                                   '--account-name', storage_account]) + '\n')
+                if 'output' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output'].keys():
+                        path = self.conf[PROFILING]['output'][key]
+                        local_name = os.path.basename(path)
+                        local_name_dict[key] = local_name
+                if 'output-recursive' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output-recursive'].keys():
+                        path = self.conf[PROFILING]['output-recursive'][key]
+                        local_name = os.path.basename(path)
+                        local_name_dict[key] = local_name
+                if self.conf[PROFILING].get('script'):
+                    with open(self.conf[PROFILING]['script'], 'r') as ori:
+                        for line in ori:
+                            sub_line = Template(line).safe_substitute(local_name_dict)
+                            job_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + sub_line + '\n')
+                else:
+                    for line in self.conf[PROFILING]['command'].splitlines():
+                        sub_line = Template(line).safe_substitute(local_name_dict)
+                        job_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + sub_line + '\n')
+                job_script.write("awk '{print $1}' result.txt > time_result.txt\n")
+                job_script.write("awk '{print $2}' result.txt > mem_result.txt\n")
+
+                mem_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                    str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                time_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                    str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                result_path = mem_path if self.mode == Profiler.mem_mode else time_path
+                result_dict[entry_count].append(result_path)
+                mem_addr = mem_path + 'try$AZ_BATCH_TASK_ID.txt'
+                time_addr = time_path + 'try$AZ_BATCH_TASK_ID.txt'
+                job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
+                                           '--container-name', storage_container, '--name', time_addr,
+                                           '--file', 'time_result.txt', '--account-name', storage_account]) + '\n')
+                job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
+                                           '--container-name', storage_container, '--name', mem_addr,
+                                           '--file', 'mem_result.txt', '--account-name', storage_account]) + '\n')
+
+                if 'output' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output'].keys():
+                        path = self.conf[PROFILING]['output'][key]
+                        basename, ext = os.path.splitext(path)
+                        path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
+                        job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
+                                                   '--container-name', storage_container, '--file', local_name_dict[key],
+                                                   '--name', path, '--account-name', storage_account]) + '\n')
+                        if machine.mem > prev_mem:
+                            output_dict[entry_count][key] = path
+                if 'output-recursive' in self.conf[PROFILING]:
+                    for key in self.conf[PROFILING]['output-recursive'].keys():
+                        path = self.conf[PROFILING]['output-recursive'][key]
+                        path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
+                        job_script.write(' '.join(['az', 'storage', 'blob', 'upload-batch', '--destination',
+                                                   storage_container, '--source', local_name_dict[key], '--destination-path',
+                                                   path, '--account-name', storage_account]) + '\n')
+                        if machine.mem > prev_mem:
+                            output_dict[entry_count][key] = path
+
+                blobs = self.container_client.list_blobs(name_starts_with=result_path + 'try')
+                if blobs and len(list(blobs)) >= tries and not self.conf[PROFILING].get('force', False):
+                    job_script.close()
+                    print("Result files exist. Job skipped.")
+                else:
+                    job_script.seek(0)
+                    disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
+                    scheduler = AzureBatchScheduler(self.conf, machine, disk_size, job_script.name)
+                    job, task = scheduler.submit_job(tries)
+                    jobs.append(job)
+                    tasks.append(task)
+                    time.sleep(1)
+            prev_mem = machine.mem
+        if jobs:
+            scheduler = AzureBatchScheduler(self.conf, None, None, None)
+            scheduler.wait_for_tasks_to_complete(jobs)
+
+        self.output_dict = output_dict
+        return result_dict, tasks
+
 
 class BaseProfiler(object):
     def __init__(self, mode, conf):
         self.mode = mode
         self.conf = conf
         self.output_dict = None
+
 
 class CromwellProfiler(BaseProfiler):
     def profile(self, input_dict, machines):
@@ -330,6 +489,7 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             dsub_script.close()
             shutil.rmtree(temp)
         return result_dict
+
 
 class BashProfiler(BaseProfiler):
     # A hook to allow pickling object for multiprocessing

@@ -15,6 +15,11 @@ _DEPENDENCIES = [
         'scikit-learn==0.23.2',
         'google-cloud-storage==1.30.0',
         'boto3==1.14.38',
+        'retry == 0.9.2'
+        'azure-storage-blob==12.6.0',
+        'azure-identity==1.5.0',
+        'azure-batch==10.0.0',
+        'azure-mgmt-compute==18.0.0',
 ]
 setup(
         name='CloudHummingbird',
@@ -39,6 +44,7 @@ setup(
         #extras_require={
         #    'aws': ['boto3==1.14.38'],
         #    'gcp': ['google-cloud-storage==1.30.0','dsub==0.3.6'],
+        #    'azure': ['azure-storage-blob==12.6.0', 'azure-identity==1.5.0', 'azure-batch==10.0.0', 'azure-mgmt-compute==18.0.0']
         #},
         include_package_data=True,
         package_data={

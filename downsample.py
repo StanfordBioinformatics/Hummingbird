@@ -66,6 +66,8 @@ class Downsample(object):
                 downsampled.update(self.downsample_by_type(type_dict[type], type))
             elif self.conf[PLATFORM]['service'] == 'aws':
                 downsampled.update(self.downsample_by_type_aws(type_dict[type], type))
+            elif self.conf[PLATFORM]['service'] == 'azure':
+                downsampled.update(self.downsample_by_type_azure(type_dict[type], type))
         return downsampled
 
     def downsample_by_type(self, key_file_dict, type):
@@ -222,8 +224,64 @@ class Downsample(object):
             return downsampled
 
         ds_script.seek(0)
-        machine = AWS_Instance('r4.xlarge')
-        scheduler = BatchScheduler(self.conf, machine, 200, ds_script.name)
+        machine = AWSInstance('r4.xlarge')
+        scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name)
         jobname = scheduler.submit_job()
-        BatchScheduler.wait_jobs([jobname])
+        AWSBatchScheduler.wait_jobs([jobname])
+        return downsampled
+
+    def downsample_by_type_azure(self, key_file_dict, type):
+        """Downsample using Azure Batch"""
+        if self.fullrun:
+            return {self.conf[DOWNSAMPLE]['target']: key_file_dict}
+
+        if type == SAM or type == BAM:
+            tool = Downsample.default_sam_tool
+            sys.exit('SAM/BAM Downsample is unsupported in Azure')
+        else:
+            tool = Downsample.default_fa_tool
+
+        from azure.storage.blob import BlobServiceClient
+        storage_account = self.conf[PLATFORM]['storage_account']
+        storage_container = self.conf[PLATFORM]['storage_container']
+        blob_client = BlobServiceClient.from_connection_string(self.conf[PLATFORM]['storage_connection_string'])
+        container_client = blob_client.get_container_client(container=storage_container)
+
+        output_path = self.conf[DOWNSAMPLE]['output'].strip('/')
+        downsampled = defaultdict(dict)
+        skip = True
+
+        ds_script = tempfile.NamedTemporaryFile(mode='w')  # 'w' mode for python3 csv.writer
+
+        for key in key_file_dict:
+            input_path = key_file_dict[key]
+            local_name = os.path.basename(input_path)
+            ds_script.write(' '.join(['az', 'storage', 'blob', 'download',
+                                      '--container-name', storage_container, '--name', input_path,
+                                      '--file', local_name, '--account-name', storage_account]) + '\n')
+            base, extension = os.path.splitext(input_path)
+            while extension in ZIP_EXT:
+                base, extension = os.path.splitext(base)
+            for frac, count_int in zip(self.fractions, self.counts):
+                target_file = os.path.basename(base) + '_' + tool + '_' + humanize(count_int) + extension
+                ds_script.write(' '.join(['seqtk', 'sample', local_name, str(frac), '>', target_file]) + '\n')
+                target_path = '/'.join([output_path, target_file])
+                ds_script.write(' '.join(['az', 'storage', 'blob', 'upload', '--container-name',
+                                          storage_container, '--file', target_file, '--name', target_path,
+                                          '--account-name', storage_account]) + '\n')
+                downsampled[count_int][key] = target_path
+
+                blobs = container_client.list_blobs(name_starts_with=target_path)
+                if not blobs or len(list(blobs)) == 0:
+                    skip = False
+
+        if skip:
+            print("Downsampled files exist, skip downsampling.")
+            return downsampled
+
+        ds_script.seek(0)
+        machine = AzureInstance()
+        scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name)
+        job_id, task_id = scheduler.submit_job()
+        scheduler.wait_for_tasks_to_complete([job_id])
         return downsampled
