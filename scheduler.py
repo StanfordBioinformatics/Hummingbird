@@ -173,7 +173,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         self.machine = machine
         self.disk_size = disk_size
         self.script = script
-        self.script_target_name = os.path.basename(self.script) + '.sh'
+        self.script_target_name = os.path.basename(self.script) + '.sh' if script else None
         self.task_definition = self._get_task_definition()
         self.image = self.task_definition['image']
         self.batch_client = self._get_azure_batch_client(conf)
@@ -210,13 +210,13 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         sku_to_use, image_ref_to_use = self.select_latest_verified_vm_image_with_node_agent_sku()
 
-        container_conf = batchmodels.ContainerConfiguration(container_image_names=[self.image])
+        container_configuration = batchmodels.ContainerConfiguration(container_image_names=[self.image])
 
         config = batchmodels.VirtualMachineConfiguration(
             image_reference=image_ref_to_use,
             node_agent_sku_id=sku_to_use,
             data_disks=[batchmodels.DataDisk(disk_size_gb=self.disk_size, lun=0)],
-            container_conf=container_conf,
+            container_configuration=container_configuration,
         )
 
         pool = batchmodels.PoolAddParameter(
@@ -245,7 +245,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return pool
 
     def select_latest_verified_vm_image_with_node_agent_sku(
-            self, publisher='Canonical', offer='UbuntuServer', sku_starts_with='18.04'):
+            self, publisher='microsoft-azure-batch', offer='ubuntu-server-container', sku_starts_with='16-04'):
         """Select the latest verified image that Azure Batch supports given
         a publisher, offer and sku (starts with filter).
         :param batch_client: The batch client to use.
@@ -319,7 +319,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_ACCOUNT', value=platform['storage_account']),
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONTAINER', value=platform['storage_container']),
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONNECTION_STRING', value=platform['storage_connection_string']),
-            batchmodels.EnvironmentSetting(name='DESTINATION_PATH', value=self.script_target_name),
+            batchmodels.EnvironmentSetting(name='BLOB_NAME', value=self.script_target_name),
         ]
 
         constraints = None
@@ -330,13 +330,21 @@ class AzureBatchScheduler(BaseBatchSchduler):
                 retention_time=self.task_definition['constraints'].get('retentionTime', "P1D"),
             ),
 
+        user_identity = batchmodels.UserIdentity(
+            auto_user=batchmodels.AutoUserSpecification(
+                scope=batchmodels.AutoUserScope.pool,
+                elevation_level=batchmodels.ElevationLevel.admin
+            )
+        )
+
         task = batchmodels.TaskAddParameter(
             id=task_id,
             display_name=task_id,
             command_line=self.task_definition['commandLine'],
             constraints=constraints[0],
             container_settings=container_settings,
-            environment_settings=environment_settings
+            environment_settings=environment_settings,
+            user_identity=user_identity,
         )
 
         for validation in task.validate():
@@ -346,7 +354,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return task
 
-    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(minutes=30)):
+    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=8)):
         """
         Returns when all tasks in the specified job reach the Completed state.
         :param str jibs: The id of the jobs whose tasks should be monitored.
@@ -389,12 +397,5 @@ class AzureBatchScheduler(BaseBatchSchduler):
         pool_id = self.create_pool()
         job = self.create_job(pool_id)
         self.upload_script()
-        self.add_task(job.id, default_max_tries=tries)
-        return job.id
-
-
-if __name__ == "__main__":
-    ins = AWSInstance('r4.xlarge')
-    scheduler = AWSBatchScheduler(ins, 75, "s3://")
-    scheduler.update_job_queue(scheduler.create_compute_environment())
-    scheduler.reg_job_def()
+        task = self.add_task(job.id, default_max_tries=tries)
+        return job.id, task.id

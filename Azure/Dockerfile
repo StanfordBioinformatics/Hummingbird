@@ -2,6 +2,8 @@ FROM broadinstitute/gatk:4.1.3.0
 
 LABEL gatk.version="4.1.3.0"
 
+ENV DEBIAN_FRONTEND noninteractive
+
 RUN apt-get update && apt-get install -y \
     bwa \
     git \
