@@ -18,7 +18,7 @@ class Instance:
             return AWSInstance.get_machine_types(['r4', 'r5'], cpu_list, min_mem)
         elif service in ['azure', 'az']:
             location = conf['Platform']['location']
-            return AzureInstance.get_machine_types(location, cpu_list, min_mem)
+            return AzureInstance.get_machine_types(conf, location, cpu_list, min_mem)
 
     def __init__(self, name, cpu, mem):
         self.name = name
@@ -46,6 +46,7 @@ class Instance:
 
     def get_core(self):
         return str(self.cpu)
+
 
 class GCPInstance(Instance):
     pricing = {
@@ -179,17 +180,20 @@ class AWSInstance(Instance):
         return valid, invalid
 
 
-class AzureInstance(Instance):
-    pricing = {
-        'Standard_E2_v3': 0.148,
-        'Standard_E4_v3': 0.296,
-        'Standard_E8_v3': 0.56,
-        'Standard_E16_v3': 1.12,
-        'Standard_E20_v3': 1.48,
-        'Standard_E32_v3': 2.24,
-    }
+AZURE_INSTANCE_PRICES = {
+    'Standard_E2_v3': 0.148,
+    'Standard_E4_v3': 0.296,
+    'Standard_E8_v3': 0.56,
+    'Standard_E16_v3': 1.12,
+    'Standard_E32_v3': 2.24,
+}
 
-    def __init__(self, machine=None, name=None, cpu=None, mem=None):
+
+class AzureInstance(Instance):
+    pricing = AZURE_INSTANCE_PRICES
+
+    def __init__(self, conf, machine=None, name=None, cpu=None, mem=None):
+        self.conf = conf
         if name is None:
             if not mem:
                 mem = 16
@@ -212,20 +216,20 @@ class AzureInstance(Instance):
             raise Exception('Fail to set price.')
 
     def desc_instance(self, name, region):
-        desc = self.filter_matchines(region, f"[?name=='{name}']")[0]
+        desc = self.filter_machines(self.conf, region, [name])[0]
         return self.get_machine_specs(desc)
 
     @staticmethod
     def get_machine_specs(machine):
-        return int(machine['numberOfCores']), int(machine['memoryInMb']) / 1024
+        return int(machine['numberOfCores']), int(machine['memoryInMB']) / 1024
 
     @staticmethod
-    def get_machine_types(location, cpu_list, min_mem):
+    def get_machine_types(conf, location, cpu_list, min_mem):
         valid, invalid = [], []
-        all_machines = AzureInstance.filter_matchines(location, "[?starts_with(name, 'Standard_E')]|[?ends_with(name, '_v3')]|[?numberOfCores<=\`32\`]")
+        all_machines = AzureInstance.filter_machines(conf, location, AZURE_INSTANCE_PRICES.keys())
         for machine in all_machines:
             for cpu, mem in zip(cpu_list, min_mem):
-                ins = AzureInstance(machine=machine, name=machine['name'], cpu=cpu, mem=mem)
+                ins = AzureInstance(conf, machine=machine, name=machine['name'], cpu=cpu, mem=mem)
                 if ins.mem >= mem:
                     valid.append(ins)
                 else:
@@ -233,6 +237,17 @@ class AzureInstance(Instance):
         return valid, invalid
 
     @staticmethod
-    def filter_matchines(location, query):
-        output = subprocess.check_output(['az', 'vm', 'list-sizes', '--location', location, '--query', query])
-        return json.loads(output)
+    def filter_machines(conf, location, machine_names):
+        from azure.identity import AzureCliCredential
+        from azure.mgmt.compute import ComputeManagementClient
+
+        machine_names = set(machine_names)
+        credential = AzureCliCredential()
+        subscription_id = conf['Platform']['subscription']
+        compute_client = ComputeManagementClient(credential, subscription_id)
+
+        machines = []
+        for vm in compute_client.virtual_machine_sizes.list(location):
+            if vm.name in machine_names:
+                machines.append(vm.serialize())
+        return machines
