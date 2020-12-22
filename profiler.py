@@ -52,8 +52,7 @@ class Profiler(object):
             self.client = storage.Client(project=conf[PLATFORM]['project'])
         elif self.service == 'azure':
             import logging
-            logger = logging.getLogger('azure')
-            logger.setLevel(logging.WARNING)
+            logging.getLogger('azure').setLevel(logging.WARNING)
             from azure.storage.blob import BlobServiceClient
             self.client = BlobServiceClient.from_connection_string(conf[PLATFORM]['storage_connection_string'])
             self.container_client = self.client.get_container_client(container=conf[PLATFORM]['storage_container'])
@@ -114,7 +113,9 @@ class Profiler(object):
                                 value = self.get_azure_blob_value(blob_client)
                                 value = json.loads(value)
                                 total += value
-                            except ResourceNotFoundError:
+                            except ResourceNotFoundError as e:
+                                print(f'Unable to download {path}. Trying again...')
+                                print(e)
                                 pass
 
                         profiling_dict['script'][entry_count].append(total / len(tasks))
@@ -274,7 +275,7 @@ class Profiler(object):
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
-                machines.append(AzureInstance(self.conf, machine='Standard_E' + AWSInstance.thread_suffix[thread] + '_v3'))
+                machines.append(AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[int(thread)]))
         tries = self.conf[PROFILING].get('tries', 1)
 
         result_dict = defaultdict(list)

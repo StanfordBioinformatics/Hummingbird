@@ -226,7 +226,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
             id=pool_id,
             display_name=pool_id,
             virtual_machine_configuration=config,
-            vm_size=self.machine,
+            vm_size=self.machine.name,
         )
 
         if self.conf[PLATFORM].get('low_priority', False):
@@ -366,7 +366,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         return task
 
-    @retry(tries=3, delay=1)
+    @retry(tries=10, delay=1, backoff=2, max_delay=10)
     def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=8)):
         """
         Returns when all tasks in the specified job reach the Completed state.

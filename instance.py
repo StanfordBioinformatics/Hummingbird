@@ -182,32 +182,33 @@ class AWSInstance(Instance):
         return valid, invalid
 
 
-AZURE_INSTANCE_PRICES = {
-    'Standard_E2_v3': 0.148,
-    'Standard_E4_v3': 0.296,
-    'Standard_E8_v3': 0.56,
-    'Standard_E16_v3': 1.12,
-    'Standard_E32_v3': 2.24,
-}
-
-
 class AzureInstance(Instance):
-    pricing = AZURE_INSTANCE_PRICES
+    pricing = {
+        'Standard_E2_v3': 0.148,
+        'Standard_E4_v3': 0.296,
+        'Standard_E8_v3': 0.56,
+        'Standard_E16_v3': 1.12,
+        'Standard_E32_v3': 2.24,
+    }
+
+    machine_thread_mapping = {
+        2: 'Standard_E2_v3',
+        4: 'Standard_E4_v3',
+        8: 'Standard_E8_v3',
+        16: 'Standard_E16_v3',
+        32: 'Standard_E32_v3'
+    }
 
     def __init__(self, conf, machine=None, name=None, cpu=None, mem=None):
         self.conf = conf
-        if name is None:
-            if not mem:
-                mem = 16
-            if not cpu:
-                cpu = 2
-            super(AzureInstance, self).__init__('Standard_E2_v3', cpu, mem)
-        elif machine:
+        if machine:
             vcpu, mem = self.get_machine_specs(machine)
             super(AzureInstance, self).__init__(name, vcpu, mem)
         elif name:
-            vcpu, mem = self.desc_instance(name)
+            vcpu, mem = self.desc_instance(name, conf['Platform']['location'])
             super(AzureInstance, self).__init__(name, vcpu, mem)
+        else:
+            super(AzureInstance, self).__init__('Standard_E4_v3', cpu or 4, mem or 32)
 
     def set_price(self, price=None):
         if price:
@@ -218,7 +219,7 @@ class AzureInstance(Instance):
             raise Exception('Fail to set price.')
 
     def desc_instance(self, name, region):
-        desc = self.filter_machines(self.conf, region, [name])[0]
+        desc = self.filter_machine(self.conf, region, name)
         return self.get_machine_specs(desc)
 
     @staticmethod
@@ -228,7 +229,7 @@ class AzureInstance(Instance):
     @staticmethod
     def get_machine_types(conf, location, cpu_list, min_mem):
         valid, invalid = [], []
-        all_machines = AzureInstance.filter_machines(conf, location, AZURE_INSTANCE_PRICES.keys())
+        all_machines = AzureInstance.filter_machines(conf, location, AzureInstance.pricing.keys())
         for machine in all_machines:
             for cpu, mem in zip(cpu_list, min_mem):
                 ins = AzureInstance(conf, machine=machine, name=machine['name'], cpu=cpu, mem=mem)
@@ -254,3 +255,7 @@ class AzureInstance(Instance):
             if vm.name in machine_names:
                 machines.append(vm.serialize())
         return machines
+
+    @staticmethod
+    def filter_machine(conf, location, machine_name):
+        return AzureInstance.filter_machines(conf, location, [machine_name])[0]
