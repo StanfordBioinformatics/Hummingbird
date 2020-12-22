@@ -113,9 +113,7 @@ class Profiler(object):
                                 value = self.get_azure_blob_value(blob_client)
                                 value = json.loads(value)
                                 total += value
-                            except ResourceNotFoundError as e:
-                                print(f'Unable to download {path}. Trying again...')
-                                print(e)
+                            except ResourceNotFoundError:
                                 pass
 
                         profiling_dict['script'][entry_count].append(total / len(tasks))
