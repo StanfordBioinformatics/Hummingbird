@@ -282,7 +282,7 @@ class Downsample(object):
             return downsampled
 
         ds_script.seek(0)
-        machine = AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[32])
+        machine = AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[8])
         scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name)
         job_id, task_id = scheduler.submit_job()
         scheduler.wait_for_tasks_to_complete([job_id])
