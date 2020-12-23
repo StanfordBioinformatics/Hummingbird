@@ -19,8 +19,7 @@ class Instance:
         elif service == 'aws':
             return AWSInstance.get_machine_types(['r4', 'r5'], cpu_list, min_mem)
         elif service in ['azure', 'az']:
-            location = conf['Platform']['location']
-            return AzureInstance.get_machine_types(conf, location, cpu_list, min_mem)
+            return AzureInstance.get_machine_types(conf, cpu_list, min_mem)
 
     def __init__(self, name, cpu, mem):
         self.name = name
@@ -218,8 +217,8 @@ class AzureInstance(Instance):
         else:
             raise Exception('Fail to set price.')
 
-    def desc_instance(self, name, region):
-        desc = self.filter_machine(self.conf, region, name)
+    def desc_instance(self, name, location):
+        desc = self.filter_machine(self.conf, location, name)
         return self.get_machine_specs(desc)
 
     @staticmethod
@@ -227,16 +226,18 @@ class AzureInstance(Instance):
         return int(machine['numberOfCores']), int(machine['memoryInMB']) / 1024
 
     @staticmethod
-    def get_machine_types(conf, location, cpu_list, min_mem):
+    def get_machine_types(conf, cpu_list, min_mem):
         valid, invalid = [], []
-        all_machines = AzureInstance.filter_machines(conf, location, AzureInstance.pricing.keys())
-        for machine in all_machines:
-            for cpu, mem in zip(cpu_list, min_mem):
-                ins = AzureInstance(conf, machine=machine, name=machine['name'], cpu=cpu, mem=mem)
-                if ins.mem >= mem:
-                    valid.append(ins)
-                else:
-                    invalid.append(ins)
+        for cpu, mem in zip(cpu_list, min_mem):
+            cpu = int(cpu)
+            if cpu not in AzureInstance.machine_thread_mapping:
+                continue
+
+            ins = AzureInstance(conf, AzureInstance.machine_thread_mapping[cpu])
+            if ins.mem >= mem:
+                valid.append(ins)
+            else:
+                invalid.append(ins)
         return valid, invalid
 
     @staticmethod
