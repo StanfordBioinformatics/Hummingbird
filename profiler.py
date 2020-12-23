@@ -165,7 +165,7 @@ class Profiler(object):
                         print(taskname, entry_count, res_set)
         return profiling_dict
 
-    @retry(tries=10, delay=1, max_delay=10, backoff=2)
+    @retry(tries=10, delay=1, max_delay=10, backoff=2, logger=None)
     def get_azure_blob_value(self, blob_client):
         return blob_client.download_blob().readall()
 

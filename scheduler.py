@@ -370,7 +370,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
     def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=24)):
         """
         Returns when all tasks in the specified job reach the Completed state.
-        :param str jibs: The id of the jobs whose tasks should be monitored.
+        :param str job_ids: The id of the jobs whose tasks should be monitored.
         :param timedelta timeout: The duration to wait for task completion. If all
         tasks in the specified job do not reach Completed state within this time
         period, an exception will be raised.
