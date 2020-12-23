@@ -3,9 +3,9 @@
     "image": "amiralavi/hummingbird-azure:v4",
     "commandLine": "/bin/bash -c '/usr/local/bin/fetch_and_run.sh'",
     "constraints": {
-      "maxWallClockTime": "P1D",
+      "maxWallClockTime": "P4D",
       "maxTaskRetryCount": 1,
-      "retentionTime": "P1D"
+      "retentionTime": "P4D"
     },
     "environmentSettings": []
   }

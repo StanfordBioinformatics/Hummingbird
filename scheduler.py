@@ -367,7 +367,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return task
 
     @retry(tries=10, delay=1, backoff=2, max_delay=10)
-    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=8)):
+    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=24)):
         """
         Returns when all tasks in the specified job reach the Completed state.
         :param str jibs: The id of the jobs whose tasks should be monitored.
