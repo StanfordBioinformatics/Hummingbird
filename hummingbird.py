@@ -31,7 +31,7 @@ def main():
         config = json.load(config_file)
         config[DOWNSAMPLE]['tool'] = args.downsample_tool
 
-    logging.basicConfig(format='%(asctime)s: %(message)s',datefmt='%m/%d/%Y %I:%M:%S %p',level=logging.INFO)
+    logging.basicConfig(format='%(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
     logging.info('Preparing downsampling...')
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
@@ -88,9 +88,6 @@ def main():
         #cus = 'no'
         if cus.lower() == 'y' or cus.lower() == 'yes':
             cus_types = []
-            # for i, t in enumerate(thread_list):
-                # print('min-core: {:2}\tmin-mem: {} GB'.format(t, min_mem[i]))
-                # cus_types.append(GCPInstance(cpu=t, mem=math.ceil(min_mem[i])))
             while True:
                 ins_name = input('instance types:')
                 if ins_name:

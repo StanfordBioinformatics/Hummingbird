@@ -51,7 +51,7 @@ fetch_and_run_script () {
     || error_exit "Failed to download file from ${AZURE_STORAGE_CONTAINER}"
 
   chmod u+x "${script}" || error_exit "Failed to chmod script."
-  ( exec "${script}" "${@}" ) || error_exit " Failed to execute script."
+  ( exec "${script}" "${@}" ) || error_exit "Failed to execute script."
 }
 
 fetch_and_run_script "${@}"
