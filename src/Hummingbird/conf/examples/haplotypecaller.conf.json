@@ -1,0 +1,43 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_BAM": "gs://gbsc-gcp-project-hummingbird-user-xingziye/platinum-genomes/bam/NA12890.sorted.bam"
+    },
+    "target": 1417289160,
+    "output": "downsampled/platinum-genomes/bam",
+    "logging": "logging/platinum-genomes/bam"
+  },
+  "Profiling": [
+    {
+      "image": "xingziye/seqdownsample:latest",
+      "logging": "logging/haplotypecaller/index",
+      "result": "result/haplotypecaller/index",
+      "command": "samtools index ${INPUT_BAM} ${OUTPUT_BAI}",
+      "output": {
+        "OUTPUT_BAI": "output/haplotypecaller/index/NA12890.sorted.bam.bai"
+      }
+    },
+    {
+      "image": "broadinstitute/gatk:4.1.0.0",
+      "logging": "logging/haplotypecaller/workflow",
+      "thread": [8],
+      "result": "result/haplotypecaller/workflow",
+      "wdl_file": "input/haplotypecaller/haplotypecaller-gvcf-gatk4.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "json_input": [
+        [
+          "input/haplotypecaller/haplotypecaller-gvcf-gatk4.inputs.1417289.json",
+          "input/haplotypecaller/haplotypecaller-gvcf-gatk4.inputs.14172891.json",
+          "input/haplotypecaller/haplotypecaller-gvcf-gatk4.inputs.141728916.json"
+        ]
+      ],
+      "output": "output/haplotypecaller/workflow"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "NORMAL_BAM": "gs://gbsc-gcp-project-hummingbird-user-xingziye/TCRB/case_001/TCRBOA1-N-WEX.bam",
+      "TUMOR_BAM": "gs://gbsc-gcp-project-hummingbird-user-xingziye/TCRB/case_001/TCRBOA1-T-WEX.bam"
+    },
+    "target": 81194486,
+    "_target_tumor": 86615196,
+    "output": "downsampled/TCRB/case_001",
+    "logging": "logging/TCRB/case_001/downsample",
+    "index": true
+  },
+  "Profiling": [
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/mutect2/command-line",
+      "thread": [8, 16, 32],
+      "input": {
+        "REF": "gs://gatk-best-practices/somatic-b37/Homo_sapiens_assembly19.fasta",
+        "REF_FAI": "gs://gatk-best-practices/somatic-b37/Homo_sapiens_assembly19.fasta.fai",
+        "REF_DICT": "gs://gatk-best-practices/somatic-b37/Homo_sapiens_assembly19.dict"
+      },
+      "command": "gatk Mutect2 -R ${REF} -I:tumor ${TUMOR_BAM} -I:normal ${NORMAL_BAM} -O ${OUTPUT_VCF}",
+      "result": "result/mutect2/command-line",
+      "output": {
+        "OUTPUT_VCF": "output/mutect2/command-line/output.vcf"
+      },
+      "tries": 3
+    }
+  ]
+}

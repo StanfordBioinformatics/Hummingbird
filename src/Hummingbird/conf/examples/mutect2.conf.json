@@ -1,0 +1,46 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "NORMAL_BAM": "gs://gatk-best-practices/somatic-b37/HCC1143_normal.bam",
+      "TUMOR_BAM": "gs://gatk-best-practices/somatic-b37/HCC1143.bam"
+    },
+    "target": 75192118,
+    "_target_tumor": 96756841,
+    "output": "downsampled/gatk-best-practices/somatic-b37",
+    "logging": "logging/gatk-best-practices/somatic-b37/downsample"
+  },
+  "Profiling": [
+    {
+      "image": "xingziye/seqdownsample:latest",
+      "logging": "logging/mutect2/index",
+      "result": "result/mutect2/index",
+      "command": "samtools index ${NORMAL_BAM} ${NORMAL_BAI}; samtools index ${TUMOR_BAM} ${TUMOR_BAI}",
+      "output": {
+        "NORMAL_BAI": "output/mutect2/index/HCC1143_normal.bai",
+        "TUMOR_BAI": "output/mutect2/index/HCC1143.bai"
+      }
+    },
+    {
+      "image": "broadinstitute/gatk:4.1.2.0",
+      "logging": "logging/mutect2/gatk-best-practices",
+      "thread": [8],
+      "result": "result/mutect2/gatk-best-practices",
+      "wdl_file": "input/mutect2/mutect2.wdl",
+      "backend_conf": "input/gfs-backend.conf",
+      "json_input": [
+        [
+          "input/mutect2/mutect2.exome.inputs.sample.75192.json",
+          "input/mutect2/mutect2.exome.inputs.sample.751921.json",
+          "input/mutect2/mutect2.exome.inputs.sample.7519211.json"
+        ]
+      ],
+      "output": "output/mutect2/gatk-best-practices"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+    "LaunchTemplateName":"hummingbird_disk_launch_template",
+    "LaunchTemplateData": {
+        "BlockDeviceMappings": [
+          {
+            "Ebs": {
+              "DeleteOnTermination": true,
+              "VolumeSize": 100,
+              "VolumeType": "gp2"
+            },
+            "DeviceName": "/dev/xvdcz"
+          }
+        ],
+        "UserData": "I2Nsb3VkLWJvb3Rob29rCiMhL2Jpbi9iYXNoCmNsb3VkLWluaXQtcGVyIG9uY2UgZG9ja2VyX29wdGlvbnMgZWNobyAnT1BUSU9OUz0iJHtPUFRJT05TfSAtLXN0b3JhZ2Utb3B0IGRtLmJhc2VzaXplPTc1RyInID4+IC9ldGMvc3lzY29uZmlnL2RvY2tlcg=="
+  }
+}

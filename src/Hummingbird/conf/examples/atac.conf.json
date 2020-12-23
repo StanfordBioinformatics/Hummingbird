@@ -1,0 +1,33 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_FILE1": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair1/ENCFF341MYG.fastq.gz",
+      "INPUT_FILE2": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair2/ENCFF248EJF.fastq.gz"
+    },
+    "target": 76000000,
+    "output": "downsampled/ENCODE/ENCSR356KRQ",
+    "logging": "logging/ENCODE/ENCSR356KRQ"
+  },
+  "Profiling": [
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/atac-seq-pipeline",
+      "thread": [32],
+      "result": "result/atac-seq-pipeline",
+      "wdl_file": "input/atac-seq-pipeline/my_atac.wdl",
+      "backend_conf": "input/backend.conf",
+      "json_input": [
+        [
+          "input/atac-seq-pipeline/ENCSR356KRQ_32.json"
+        ]
+      ],
+      "output": "output/atac-seq-pipeline"
+    }
+  ]
+}

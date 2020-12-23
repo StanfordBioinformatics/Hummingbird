@@ -1,0 +1,36 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_BAM": "gs://gbsc-gcp-project-hummingbird-user-xingziye/platinum-genomes/bam/NA12890.sorted.bam"
+    },
+    "target": 1417289160,
+    "output": "downsampled/platinum-genomes/bam",
+    "logging": "logging/platinum-genomes/bam",
+    "index": true,
+    "fullrun": true
+  },
+  "Profiling": [
+    {
+      "image": "broadinstitute/gatk:4.1.2.0",
+      "logging": "logging/haplotypecaller/command-line",
+      "thread": [8, 16, 32],
+      "input": {
+        "REF": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta",
+        "REF_FAI": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta.fai",
+        "REF_DICT": "gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.dict"
+      },
+      "command": "gatk --java-options \"-Xmx32g\" HaplotypeCaller -R ${REF} -I ${INPUT_BAM} -O ${OUTPUT_VCF}",
+      "output": {
+        "OUTPUT_VCF": "output/haplotypecaller/command-line/output.vcf"
+      },
+      "result": "result/haplotypecaller/command-line",
+      "tries": 3
+    }
+  ]
+}

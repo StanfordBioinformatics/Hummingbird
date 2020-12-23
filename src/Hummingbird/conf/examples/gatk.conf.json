@@ -1,0 +1,67 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_FILE1": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz",
+      "INPUT_FILE2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
+    },
+    "target": 707646124,
+    "output": "downsampled/gatk-mvp/platinum-genomes/ERR194159",
+    "logging": "logging/gatk-mvp/downsample/platinum-genomes/ERR194159"
+  },
+  "Profiling": [
+    {
+      "image": "broadinstitute/gatk:4.1.0.0",
+      "logging": "logging/gatk-mvp/fastqtoubam",
+      "result": "result/gatk-mvp/fastqtoubam",
+      "command": "/gatk/gatk --java-options \"-Xmx8G -Djava.io.tmpdir=bla\" FastqToSam -F1 ${INPUT_FILE1} -F2 ${INPUT_FILE2} -O ${OUTPUT_FILE} -RG RG1 -SM ERR194159 -PL ILLUMINA",
+      "output": {
+        "OUTPUT_FILE": "output/gatk-mvp/fastqtoubam/ERR194159.ubam"
+        }
+    },
+    {
+      "image": "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.3.2-1510681135",
+      "logging": "logging/gatk-mvp/alignment",
+      "thread": [16],
+      "result": "result/gatk-mvp/alignment",
+      "wdl_file": "input/gatk-mvp/alignment/gatk_mvp_alignment.wdl",
+      "imports": "input/gatk-mvp/imports.zip",
+      "backend_conf": "input/gfs-backend.conf",
+      "json_input": [
+        [
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_707646_16.json",
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_7076461_16.json",
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_70764612_16.json"
+        ],
+        [
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_707646_16.json",
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_7076461_16.json",
+          "input/gatk-mvp/alignment/mvp.hg38.inputs_70764612_16.json"
+        ]
+      ],
+      "output": "output/gatk-mvp/alignment"
+    },
+    {
+      "image": "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.3.2-1510681135",
+      "logging": "logging/gatk-mvp/markdup",
+      "thread": [16],
+      "result": "result/gatk-mvp/markdup",
+      "wdl_file": "input/gatk-mvp/markdup/gatk_mvp_markdup.wdl",
+      "imports": "input/gatk-mvp/imports.zip",
+      "backend_conf": "input/gfs-backend.conf",
+      "json_input": [
+        [
+          "input/gatk-mvp/markdup/mvp.hg38.inputs_707646.json",
+          "input/gatk-mvp/markdup/mvp.hg38.inputs_7076461.json",
+          "input/gatk-mvp/markdup/mvp.hg38.inputs_70764612.json"
+        ]
+      ],
+      "output": "output/gatk-mvp/markdup"
+    }
+  ]
+}

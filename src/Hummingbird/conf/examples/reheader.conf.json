@@ -1,0 +1,33 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "SAMPLE": "gs://gbsc-gcp-project-hummingbird-user-xingziye/output/bwa/output_8_707646.sam",
+      "INPUT": "gs://gbsc-gcp-project-hummingbird-user-xingziye/output/bwa/output_8_707646124.sam"
+    },
+    "target": 707646124,
+    "fractions": [0.001, 0.01, 0.1, 0.2],
+    "output": "downsampled/platinum-genomes/fastq",
+    "logging": "logging/platinum-genomes/fastq",
+    "fullrun": true
+  },
+  "Profiling": [
+    {
+      "image": "xingziye/seqdownsample",
+      "logging": "logging/reheader",
+      "result": "result/reheader",
+      "thread": [8],
+      "command": "samtools reheader ${SAMPLE} ${INPUT} > ${OUTPUT}",
+      "output": {
+        "OUTPUT": "output/bwa/output.sam"
+      },
+      "disk": "1000",
+      "tries": 1
+    }
+  ]
+}

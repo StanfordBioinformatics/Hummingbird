@@ -1,0 +1,30 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_FILE1": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair1/ENCFF341MYG.fastq.gz",
+      "INPUT_FILE2": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair2/ENCFF248EJF.fastq.gz"
+    },
+    "target": 76000000,
+    "output": "downsampled/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ",
+    "logging": "logging/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ/downsample"
+  },
+  "Profiling": [
+    {
+      "image": "quay.io/encode-dcc/atac-seq-pipeline:v1.1.3",
+      "logging": "logging/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ/profiling",
+      "thread": [2, 4],
+      "result": "result/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ",
+      "command": "cutadapt -m 5 -e 0.1 -a CTGTCTCTTATA -A CTGTCTCTTATA ${INPUT_FILE1} ${INPUT_FILE2} -o ${OUTPUT_FILE1} -p ${OUTPUT_FILE2}",
+      "output": {
+        "OUTPUT_FILE1": "output/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ/ENCFF341MYG_trim.fastq",
+        "OUTPUT_FILE2": "output/ENCODE/atac-seq-pipeline/trimming/ENCSR356KRQ/ENCFF248EJF_trim.fastq"
+      }
+    }
+  ]
+}

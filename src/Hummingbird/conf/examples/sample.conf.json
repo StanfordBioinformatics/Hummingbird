@@ -1,0 +1,59 @@
+{
+  "Platform": {
+    "service": "gcp/aws",
+    "project": "<your-project-id>",
+    "regions": "<region>",
+    "bucket": "<your-bucket-name>"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_R1": "<your-input-file-path1>",
+      "INPUT_R2": "<your-input-file-path2>"
+    },
+    "target": "numeric value of the reads number",
+    "fractions": "list of numeric value, value must be less than 1",
+    "output": "<output-directory>",
+    "logging": "<logging-directory>",
+    "fullrun": "bool value"
+  },
+  "Profiling": [
+    {
+      "image": "<docker-iamge>",
+      "logging": "<logging-directory>",
+      "result": "<result-directory>",
+      "thread": "list of numeric value",
+      "input": {
+        "FILE": "<input-file>"
+      },
+      "input-recursive": {
+        "REF": "<input-directory>"
+      },
+      "command": "command with substitute",
+      "output": {
+        "OUTPUT1": "<output-file>"
+      },
+      "output-recursive": {
+        "FOLDER": "<output-directory>"
+      },
+      "force": "bool",
+      "disk": "numeric value",
+      "tries": "numeric value"
+    },
+    {
+      "image": "<docker-iamge>",
+      "logging": "<logging-directory>",
+      "result": "<result-directory>",
+      "thread": "list of numeric value",
+      "command": "refer to ${OUTPUT1} in command. Thus ensuring output of previous step is input to this step. This way you can chain multiple stages of a pipeline together",
+      "output": {
+        "OUTPUT2": "<output-file>"
+      },
+      "output-recursive": {
+        "FOLDER": "<output-directory>"
+      },
+      "force": "bool",
+      "disk": "numeric value",
+      "tries": "numeric value"
+    }
+  ]
+}

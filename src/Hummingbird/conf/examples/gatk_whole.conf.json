@@ -1,0 +1,44 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "FASTQ_1": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz",
+      "FASTQ_2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
+    },
+    "target": 707646124,
+    "fullrun": true,
+    "output": "downsampled/gatk-mvp/platinum-genomes/ERR194159",
+    "logging": "logging/gatk-mvp/downsample/platinum-genomes/ERR194159"
+  },
+  "Profiling": [
+    {
+      "image": "broadinstitute/gatk:4.1.0.0",
+      "logging": "logging/gatk-mvp/fastqtoubam",
+      "result": "result/gatk-mvp/fastqtoubam",
+      "command": "/gatk/gatk --java-options \"-Xmx32G -Djava.io.tmpdir='pwd'/tmp\" FastqToSam -TMP_DIR 'pwd'/tmp -F1 ${FASTQ_1} -F2 ${FASTQ_2} -O ${UBAM} -RG RG1 -SM ERR194159 -PL ILLUMINA -MAX_RECORDS_IN_RAM 10000000",
+      "output": {
+        "UBAM": "output/gatk-mvp/fastqtoubam/ERR194159.ubam"
+      }
+    },
+    {
+      "image": "us.gcr.io/broad-gotc-prod/genomes-in-the-cloud:2.3.2-1510681135",
+      "logging": "logging/gatk-mvp/whole",
+      "thread": [16],
+      "result": "result/gatk-mvp/whole",
+      "wdl_file": "input/gatk-mvp/fc_germline_single_sample_workflow.wdl",
+      "imports": "input/gatk-mvp/imports.zip",
+      "backend_conf": "input/gfs-backend.conf",
+      "json_input": [
+        [
+          "input/gatk-mvp/mvp.hg38.inputs.json"
+        ]
+      ],
+      "output": "output/gatk-mvp/whole"
+    }
+  ]
+}

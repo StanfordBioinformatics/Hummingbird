@@ -1,0 +1,63 @@
+{
+  "Platform": {
+    "service": "gcp",
+    "project": "gbsc-gcp-project-cba",
+    "regions": "us-west1",
+    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+  },
+  "Downsample": {
+    "input": {
+      "INPUT_R1": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_1.fastq.gz",
+      "INPUT_R2": "gs://genomics-public-data/platinum-genomes/fastq/ERR194159_2.fastq.gz"
+    },
+    "target": 707646124,
+    "fractions": [0.001, 0.01, 0.1],
+    "output": "downsampled/platinum-genomes/fastq",
+    "logging": "logging/platinum-genomes/fastq",
+    "fullrun": false
+  },
+  "Profiling": [
+    {
+      "image": "xingziye/bwa-gatk",
+      "logging": "logging/bwa",
+      "result": "result/bwa",
+      "thread": [32],
+      "input-recursive": {
+        "REF": "references/GRCh37lite"
+      },
+      "command": "bwa mem -t ${THREAD} -M -R '@RG\\tID:0\\tLB:Library\\tPL:Illumina\\tSM:ERR194159' ${REF}/GRCh37-lite.fa ${INPUT_R1} ${INPUT_R2} > ${OUTPUT_SAM}",
+      "output": {
+        "OUTPUT_SAM": "output/bwa/output.sam"
+      },
+      "disk": "500",
+      "tries": 1
+    },
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/picard/sortsam",
+      "result": "result/picard/sortsam",
+      "thread": [2, 4],
+      "command": "gatk --java-options \"-Xms6g -Xmx16g\" SortSam -I ${OUTPUT_SAM} -O ${SORTED_BAM} --SORT_ORDER coordinate --TMP_DIR $TMPDIR",
+      "output": {
+        "SORTED_BAM": "output/picard/sorted.bam"
+      },
+      "force": false,
+      "disk": "500",
+      "tries": 1
+    },
+    {
+      "image": "broadinstitute/gatk",
+      "logging": "logging/picard/markdup",
+      "result": "result/picard/markdup",
+      "thread": [2, 4],
+      "command": "gatk --java-options \"-Xms6g -Xmx8g\" MarkDuplicates -I ${SORTED_BAM} -M ${METRICS_FILE} -O ${DEDUP_BAM} --VALIDATION_STRINGENCY SILENT --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 --TMP_DIR $TMPDIR",
+      "output": {
+        "METRICS_FILE": "output/picard/metrics",
+        "DEDUP_BAM": "output/picard/dedup.bam"
+      },
+      "force": false,
+      "disk": "500",
+      "tries": 3
+    }
+  ]
+}
