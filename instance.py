@@ -233,7 +233,7 @@ class AzureInstance(Instance):
             if cpu not in AzureInstance.machine_thread_mapping:
                 continue
 
-            ins = AzureInstance(conf, AzureInstance.machine_thread_mapping[cpu])
+            ins = AzureInstance(conf, name=AzureInstance.machine_thread_mapping[cpu])
             if ins.mem >= mem:
                 valid.append(ins)
             else:
