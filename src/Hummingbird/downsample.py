@@ -3,9 +3,9 @@ import csv
 import sys
 import tempfile
 from collections import defaultdict
-from scheduler import *
-from hummingbird_utils import *
-from instance import *
+from Hummingbird.scheduler import *
+from Hummingbird.hummingbird_utils import *
+from Hummingbird.instance import *
 
 class Downsample(object):
     """Generate subsamples for input data.

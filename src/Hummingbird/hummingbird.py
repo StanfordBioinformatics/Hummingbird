@@ -7,10 +7,10 @@ import logging
 import math
 import sys
 
-from downsample import Downsample
-from profiler import Profiler
-from instance import *
-from hummingbird_utils import *
+from Hummingbird.downsample import Downsample
+from Hummingbird.profiler import Profiler
+from Hummingbird.instance import *
+from Hummingbird.hummingbird_utils import *
 
 
 def main():
