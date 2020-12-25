@@ -14,15 +14,10 @@ Currently, Hummingbird supports Google Cloud (GCP) and Amazon Web Service (AWS) 
 
 ### Installation Instructions
 
-Based on which cloud service provider you want to use, Hummingbird can be installed using
+Hummingbird can be installed using
 ```
-pip install Hummingbird[gcp]
+pip install CloudHummingbird
 ```
-for Google cloud, and
-```
-pip install Hummingbird[aws]
-```
-for AWS
 
 It is recommended to use the ```--install-option="--prefix=$PREFIX_PATH"``` along with pip while installing Hummingbird. This would give users easy access to the sample configuration files located in conf/examples which the users might need to refer to while writing their own configuration file(s) for their own computational pipeline. Alternatively, the configuration files can be found here: ```<virtualenv_name>/lib/<python_ver>/site-packages/Hummingbird/conf/examples```
 
