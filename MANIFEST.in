@@ -11,3 +11,5 @@ include src/Hummingbird/*.md
 include src/Hummingbird/*.conf
 
 include src/Hummingbird/plot/*
+
+include src/Hummingbird/Azure/*

@@ -19,8 +19,8 @@ import time
 import os
 import logging
 
-from hummingbird_utils import *
-from instance import *
+from Hummingbird.hummingbird_utils import *
+from Hummingbird.instance import *
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
