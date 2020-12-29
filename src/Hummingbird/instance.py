@@ -183,19 +183,24 @@ class AWSInstance(Instance):
 
 class AzureInstance(Instance):
     pricing = {
-        'Standard_E2_v3': 0.148,
-        'Standard_E4_v3': 0.296,
-        'Standard_E8_v3': 0.56,
-        'Standard_E16_v3': 1.12,
-        'Standard_E32_v3': 2.24,
+        'Standard_E2_v3': 0.126,
+        'Standard_E4_v3': 0.252,
+        'Standard_E8_v3': 0.504,
+        'Standard_E16_v3': 1.008,
+        'Standard_E32_v3': 2.016,
+        'Standard_D2_v3': 0.096,
+        'Standard_D4_v3': 0.192,
+        'Standard_D8_v3': 0.384,
+        'Standard_D16_v3': 0.768,
+        'Standard_D32_v3': 1.536,
     }
 
     machine_thread_mapping = {
-        2: 'Standard_E2_v3',
-        4: 'Standard_E4_v3',
-        8: 'Standard_E8_v3',
-        16: 'Standard_E16_v3',
-        32: 'Standard_E32_v3'
+        2: ['Standard_E2_v3', 'Standard_D2_v3'],
+        4: ['Standard_E4_v3', 'Standard_D4_v3'],
+        8: ['Standard_E8_v3', 'Standard_D8_v3'],
+        16: ['Standard_E16_v3', 'Standard_D16_v3'],
+        32: ['Standard_E32_v3', 'Standard_D32_v3'],
     }
 
     def __init__(self, conf, machine=None, name=None, cpu=None, mem=None):
@@ -233,11 +238,12 @@ class AzureInstance(Instance):
             if cpu not in AzureInstance.machine_thread_mapping:
                 continue
 
-            ins = AzureInstance(conf, name=AzureInstance.machine_thread_mapping[cpu])
-            if ins.mem >= mem:
-                valid.append(ins)
-            else:
-                invalid.append(ins)
+            for name in AzureInstance.machine_thread_mapping[cpu]:
+                ins = AzureInstance(conf, name=name)
+                if ins.mem >= mem:
+                    valid.append(ins)
+                else:
+                    invalid.append(ins)
         return valid, invalid
 
     @staticmethod
