@@ -1,5 +1,6 @@
 import sys
 from datetime import datetime, timedelta
+from typing import List
 
 from retry import retry
 
@@ -218,7 +219,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         config = batchmodels.VirtualMachineConfiguration(
             image_reference=image_ref_to_use,
             node_agent_sku_id=sku_to_use,
-            data_disks=[batchmodels.DataDisk(disk_size_gb=self.disk_size, lun=0)],
+            data_disks=[batchmodels.DataDisk(disk_size_gb=self.disk_size, lun=1)],
             container_configuration=container_configuration,
         )
 
@@ -242,7 +243,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return pool_id
 
     @retry(tries=3, delay=1)
-    def get_pool(self, name):
+    def get_pool(self, name: str):
         from azure.batch.models import BatchErrorException
         try:
             pool = self.batch_client.pool.get(name)
@@ -285,7 +286,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return agent_sku_id, image_ref_to_use
 
     @retry(tries=3, delay=1)
-    def create_job(self, pool_id):
+    def create_job(self, pool_id: str):
         from azure.batch import models as batchmodels
 
         job_queue_name = pool_id + '-queue'
@@ -306,7 +307,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return job
 
     @retry(tries=3, delay=1)
-    def add_task(self, job_id, default_max_tries=None):
+    def add_task(self, job_id: str, default_max_tries=None):
         """
         Adds a task for each input file in the collection to the specified job.
         :param str job_id: The ID of the job to which to add the tasks.
@@ -367,7 +368,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         return task
 
     @retry(tries=10, delay=1, backoff=2, max_delay=10)
-    def wait_for_tasks_to_complete(self, job_ids, timeout=timedelta(hours=24)):
+    def wait_for_tasks_to_complete(self, job_ids: List[str], timeout=timedelta(hours=24)):
         """
         Returns when all tasks in the specified job reach the Completed state.
         :param str job_ids: The id of the jobs whose tasks should be monitored.
@@ -382,18 +383,21 @@ class AzureBatchScheduler(BaseBatchSchduler):
         print("Monitoring all tasks for 'Completed' state, timeout in {}...".format(timeout), end='')
 
         while datetime.now() < timeout_expiration:
+            completed_jobs = 0
             for job_id in job_ids:
                 print('.', end='')
                 sys.stdout.flush()
                 tasks = self.batch_client.task.list(job_id)
 
-                incomplete_tasks = [task for task in tasks if
-                                    task.state != batchmodels.TaskState.completed]
+                incomplete_tasks = [task for task in tasks if task.state != batchmodels.TaskState.completed]
                 if not incomplete_tasks:
-                    print()
-                    return True
-                else:
-                    time.sleep(1)
+                    completed_jobs += 1
+
+            if len(job_ids) == completed_jobs:
+                print()
+                return True
+            else:
+                time.sleep(5)
 
         print()
         raise RuntimeError("ERROR: Tasks did not reach 'Completed' state within "
@@ -401,7 +405,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
     @retry(tries=3, delay=1)
     def upload_script(self):
-        with open(self.script, "rb") as data:
+        with open(self.script, 'rb') as data:
             self.container_client.upload_blob(
                 name=self.script_target_name,
                 data=data,
@@ -412,4 +416,8 @@ class AzureBatchScheduler(BaseBatchSchduler):
         job = self.create_job(pool_id)
         self.upload_script()
         task = self.add_task(job.id, default_max_tries=tries)
-        return job.id, task.id
+        return {
+            'pool_id': pool_id,
+            'task_id': task.id,
+            'job_id': job.id,
+        }
