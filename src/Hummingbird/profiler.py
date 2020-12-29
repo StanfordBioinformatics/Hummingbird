@@ -97,15 +97,16 @@ class Profiler(object):
         elif self.service == 'azure':
             profiling_dict = dict()
             profiling_dict['script'] = defaultdict(list)
-            result_dict, tasks = self.az_batch_profile(input_dict, machines)
+            result_dict, jobs_info = self.az_batch_profile(input_dict, machines)
             container_name = self.conf[PLATFORM]['storage_container']
-            if tasks:
+            if jobs_info:
                 for entry_count in result_dict:
                     dir_list = result_dict[entry_count]
                     for dir_prefix in dir_list:
+                        matching_jobs = [job_info for job_info in jobs_info if job_info['result_path'] == dir_prefix]
                         total = 0.0
-                        for task in tasks:
-                            path = os.path.join(dir_prefix, 'try' + task + '.txt')
+                        for job_info in matching_jobs:
+                            path = os.path.join(dir_prefix, 'try' + job_info['task_id'] + '.txt')
                             blob_client = self.client.get_blob_client(container=container_name, blob=path)
 
                             from azure.core.exceptions import ResourceNotFoundError
@@ -116,14 +117,13 @@ class Profiler(object):
                             except ResourceNotFoundError:
                                 pass
 
-                        profiling_dict['script'][entry_count].append(total / len(tasks))
+                        profiling_dict['script'][entry_count].append(total / len(matching_jobs))
             return profiling_dict
 
         if machines is None: # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
-                #thread = thread.strip()
                 machines.append(GCPInstance(MACHINE_TYPE_PREFIX + str(thread)))
         tries = self.conf[PROFILING].get('tries', 1)
         if tries > 1:
@@ -165,7 +165,7 @@ class Profiler(object):
                         print(taskname, entry_count, res_set)
         return profiling_dict
 
-    @retry(tries=10, delay=1, max_delay=10, backoff=2, logger=None)
+    @retry(tries=5, delay=1, max_delay=5, logger=None)
     def get_azure_blob_value(self, blob_client):
         return blob_client.download_blob().readall()
 
@@ -174,7 +174,6 @@ class Profiler(object):
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
-                #thread = thread.strip()
                 machines.append(AWSInstance('r5' + AWSInstance.thread_suffix[thread]))
         tries = self.conf[PROFILING].get('tries', 1)
 
@@ -188,8 +187,7 @@ class Profiler(object):
             for entry_count in input_dict:
                 job_script = tempfile.NamedTemporaryFile(mode='w')
                 job_script.write('apt-get -qq update && apt-get -qq install time\n')
-                local_name_dict = {}
-                local_name_dict['THREAD'] = machine.get_core()
+                local_name_dict = {'THREAD': machine.get_core()}
                 for input_key, input_s3_path in input_dict[entry_count].items():
                     local_name = os.path.basename(input_s3_path)
                     job_script.write(' '.join(['aws', 's3', 'cp', input_s3_path, local_name]) + '\n')
@@ -273,14 +271,14 @@ class Profiler(object):
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
             for thread in thread_list:
-                machines.append(AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[int(thread)]))
+                machines.append(AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[int(thread)][-1]))
         tries = self.conf[PROFILING].get('tries', 1)
 
         result_dict = defaultdict(list)
         output_dict = defaultdict(dict)
         prev_mem = 0  # used to get output from the largest instances
         jobs = []
-        tasks = []
+        metadata = 'pool=$AZ_BATCH_POOL_ID job=$AZ_BATCH_JOB_ID task=$AZ_BATCH_TASK_ID'
 
         storage_account = self.conf[PLATFORM]['storage_account']
         storage_container = self.conf[PLATFORM]['storage_container']
@@ -339,52 +337,57 @@ class Profiler(object):
                 result_dict[entry_count].append(result_path)
                 mem_addr = mem_path + 'try$AZ_BATCH_TASK_ID.txt'
                 time_addr = time_path + 'try$AZ_BATCH_TASK_ID.txt'
-                job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
-                                           '--container-name', storage_container, '--name', time_addr,
-                                           '--file', 'time_result.txt', '--account-name', storage_account]) + '\n')
-                job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
-                                           '--container-name', storage_container, '--name', mem_addr,
-                                           '--file', 'mem_result.txt', '--account-name', storage_account]) + '\n')
+                job_script.write(' '.join([
+                    'az', 'storage', 'blob', 'upload', '--container-name', storage_container, '--name', time_addr,
+                    '--file', 'time_result.txt', '--account-name', storage_account, '--metadata', metadata]) + '\n')
+                job_script.write(' '.join([
+                    'az', 'storage', 'blob', 'upload', '--container-name', storage_container, '--name', mem_addr,
+                    '--file', 'mem_result.txt', '--account-name', storage_account, '--metadata', metadata]) + '\n')
 
                 if 'output' in self.conf[PROFILING]:
                     for key in self.conf[PROFILING]['output'].keys():
                         path = self.conf[PROFILING]['output'][key]
                         basename, ext = os.path.splitext(path)
                         path = basename + '_' + str(machine.get_core()) + '_' + humanize(str(entry_count)) + ext
-                        job_script.write(' '.join(['az', 'storage', 'blob', 'upload',
-                                                   '--container-name', storage_container, '--file', local_name_dict[key],
-                                                   '--name', path, '--account-name', storage_account]) + '\n')
+                        job_script.write(' '.join([
+                            'az', 'storage', 'blob', 'upload', '--container-name', storage_container,
+                            '--file', local_name_dict[key], '--name', path, '--account-name', storage_account,
+                            '--metadata', metadata]) + '\n')
                         if machine.mem > prev_mem:
                             output_dict[entry_count][key] = path
                 if 'output-recursive' in self.conf[PROFILING]:
                     for key in self.conf[PROFILING]['output-recursive'].keys():
                         path = self.conf[PROFILING]['output-recursive'][key]
                         path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
-                        job_script.write(' '.join(['az', 'storage', 'blob', 'upload-batch', '--destination',
-                                                   storage_container, '--source', local_name_dict[key], '--destination-path',
-                                                   path, '--account-name', storage_account]) + '\n')
+                        job_script.write(' '.join([
+                            'az', 'storage', 'blob', 'upload-batch', '--destination', storage_container,
+                            '--source', local_name_dict[key], '--destination-path', path, '--account-name', storage_account,
+                            '--metadata', metadata]) + '\n')
                         if machine.mem > prev_mem:
                             output_dict[entry_count][key] = path
 
-                blobs = self.container_client.list_blobs(name_starts_with=result_path + 'try')
-                if blobs and len(list(blobs)) >= tries and not self.conf[PROFILING].get('force', False):
+                blobs = list(self.container_client.list_blobs(name_starts_with=result_path + 'try', include='metadata'))
+                if blobs and len(blobs) >= tries and not self.conf[PROFILING].get('force', False):
                     job_script.close()
+                    for blob in blobs:
+                        jobs.append({'pool_id': blob.metadata['pool'], 'job_id': blob.metadata['job'],
+                                     'task_id': blob.metadata['task'], 'result_path': result_path})
                     print("Result files exist. Job skipped.")
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
                     scheduler = AzureBatchScheduler(self.conf, machine, disk_size, job_script.name)
-                    job, task = scheduler.submit_job(tries)
-                    jobs.append(job)
-                    tasks.append(task)
+                    job_info = scheduler.submit_job(tries=tries)
+                    job_info['result_path'] = result_path
+                    jobs.append(job_info)
                     time.sleep(1)
             prev_mem = machine.mem
         if jobs:
             scheduler = AzureBatchScheduler(self.conf, None, None, None)
-            scheduler.wait_for_tasks_to_complete(jobs)
+            scheduler.wait_for_tasks_to_complete([info['job_id'] for info in jobs])
 
         self.output_dict = output_dict
-        return result_dict, tasks
+        return result_dict, jobs
 
 
 class BaseProfiler(object):

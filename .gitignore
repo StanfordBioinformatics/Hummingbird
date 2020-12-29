@@ -6,3 +6,6 @@ dsub_libs
 plot/*.png
 plot/*.pdf
 *.pem
+build/
+dist/
+src/CloudHummingbird.egg-info/
