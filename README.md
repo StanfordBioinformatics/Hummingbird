@@ -8,7 +8,7 @@ The input for this framework is the necessary information required to run a clou
 
 The unique feature about Hummingbird is that it takes the input files, downsamples them, runs the whole computational pipeline on these downwsampled files and subsequently provides the user with different optimum instance configurations. Therefore, the users obtain the resulting configurations in a short amount of time compared to a run on the entire pipeline with the whole input file(s) for different instance configurations.
 
-Currently, Hummingbird supports Google Cloud (GCP) and Amazon Web Service (AWS) and we hope to add other cloud providers in the future.
+Currently, Hummingbird supports Google Cloud (GCP), Amazon Web Service (AWS) and Microsoft Azure, and we hope to add other cloud providers in the future.
 
 ## Installation Instructions
 
