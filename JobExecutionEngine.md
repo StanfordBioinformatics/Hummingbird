@@ -1,4 +1,4 @@
-## Section 12: Job Execution Engine
+## Section 12: Requirements for Running Hummingbird on Cloud Platform
 
 Hummingbird's job execution engine consists of the following required components:
 
