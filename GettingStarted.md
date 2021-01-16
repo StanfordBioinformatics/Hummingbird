@@ -22,7 +22,7 @@ It will ask for `Access key ID` and `Secret access key`. This credential will be
 ### Getting started on Azure Batch
 Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) and login:
 ```bash
-aws login
+az login
 ```
 
 Set the Subscription ID:
