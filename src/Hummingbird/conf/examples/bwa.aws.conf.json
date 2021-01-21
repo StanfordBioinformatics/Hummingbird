@@ -1,9 +1,9 @@
 {
   "Platform": {
     "service": "aws",
-    "project": "gbsc-aws-prj-mvp",
+    "project": "<insert project id>",
     "regions": "us-west-2",
-    "bucket": "bwa-hummingbird"
+    "bucket": "<insert root bucket without s3://>"
   },
   "Downsample": {
     "input": {
