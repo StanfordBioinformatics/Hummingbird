@@ -1,13 +1,13 @@
 {
   "Platform": {
     "service": "gcp",
-    "project": "gbsc-gcp-project-cba",
+    "project": "<insert project-id>",
     "regions": "us-west1",
-    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+    "bucket": "<insert root bucket>"
   },
   "Downsample": {
     "input": {
-      "INPUT_BAM": "gs://gbsc-gcp-project-hummingbird-user-xingziye/platinum-genomes/bam/NA12890.sorted.bam"
+      "INPUT_BAM": "gs://<insert bucket>/platinum-genomes/bam/NA12890.sorted.bam"
     },
     "target": 1417289160,
     "output": "downsampled/platinum-genomes/bam",

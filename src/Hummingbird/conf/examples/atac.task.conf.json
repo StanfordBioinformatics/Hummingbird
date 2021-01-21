@@ -1,14 +1,14 @@
 {
   "Platform": {
     "service": "gcp",
-    "project": "gbsc-gcp-project-cba",
+    "project": "<insert project-id>",
     "regions": "us-west1",
-    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+    "bucket": "<insert root bucket>"
   },
   "Downsample": {
     "input": {
-      "INPUT_FILE1": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair1/ENCFF341MYG.fastq.gz",
-      "INPUT_FILE2": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair2/ENCFF248EJF.fastq.gz"
+      "INPUT_FILE1": "gs://<insert bucket>/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair1/ENCFF341MYG.fastq.gz",
+      "INPUT_FILE2": "gs://<insert bucket>/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/rep1/pair2/ENCFF248EJF.fastq.gz"
     },
     "target": 76000000,
     "output": "downsampled/ENCODE/ENCSR356KRQ",

@@ -1,14 +1,14 @@
 {
   "Platform": {
     "service": "gcp",
-    "project": "gbsc-gcp-project-cba",
+    "project": "<insert project-id>",
     "regions": "us-west1",
-    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+    "bucket": "<insert root bucket>"
   },
   "Downsample": {
     "input": {
-      "INPUT_R1": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R1.fastq.gz",
-      "INPUT_R2": "gs://gbsc-gcp-project-hummingbird-user-xingziye/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R2.fastq.gz"
+      "INPUT_R1": "gs://<insert bucket>/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R1.fastq.gz",
+      "INPUT_R2": "gs://<insert bucket>/ENCODE/atac-seq-pipeline/ENCSR356KRQ/fastq/ENCSR356KRQ.R2.fastq.gz"
     },
     "target": 308272658,
     "fractions": [0.001, 0.01, 0.1, 0.2],

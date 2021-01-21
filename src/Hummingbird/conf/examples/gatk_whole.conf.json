@@ -1,9 +1,9 @@
 {
   "Platform": {
     "service": "gcp",
-    "project": "gbsc-gcp-project-cba",
+    "project": "<insert project-id>",
     "regions": "us-west1",
-    "bucket": "gbsc-gcp-project-hummingbird-user-xingziye"
+    "bucket": "<insert root bucket>"
   },
   "Downsample": {
     "input": {
