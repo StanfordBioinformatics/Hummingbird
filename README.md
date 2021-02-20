@@ -1,4 +1,6 @@
-# Hummingbird: Efficient Performance Prediction for Executing Genomic Applications in the Cloud
+<img src="https://github.com/StanfordBioinformatics/Hummingbird/hummingbird_2_2x.png" width="200" align="right">
+
+# Hummingbird: Efficient Performance Prediction for Executing Genomic Applications in the Cloud #
 
 ## Overview
 
