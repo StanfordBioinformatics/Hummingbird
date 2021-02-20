@@ -63,3 +63,5 @@ This section describes the fault tolerant capabilities of Hummingbird
 
 ## Section 12: [Requirements for Running Hummingbird on Cloud Platform](./CloudProviderRequirements.md)
 This section lists all required components for running Hummingbird on a Cloud Platform provider.
+
+* Logo Credit: Camille Berry
