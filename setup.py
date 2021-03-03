@@ -45,7 +45,7 @@ setup(
         package_data={
             'Hummingbird':['conf/examples/*'],
             'Hummingbird':['AWS/*'],
-            'Humminfbird':['Azure/*'],
+            'Hummingbird':['Azure/*'],
             'Hummingbird':['*.md'],
             'Hummingbird':['plot/*'],
             'Hummingbird':['*.conf'],
