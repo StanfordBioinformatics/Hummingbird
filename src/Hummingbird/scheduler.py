@@ -199,7 +199,8 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
     @staticmethod
     def _get_task_definition():
-        with open('./Azure/task.json') as task:
+        path = os.path.join(os.path.dirname(__file__), 'Azure/task.json')
+        with open(path, 'r') as task:
             return json.load(task)[0]
 
     @retry(tries=3, delay=1)
@@ -302,7 +303,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
             if err.error.code != "JobExists":
                 raise
             else:
-                print("Job {!r} already exists".format(job_queue_name))
+                logging.info("Job {!r} already exists".format(job_queue_name))
 
         return job
 
@@ -317,9 +318,13 @@ class AzureBatchScheduler(BaseBatchSchduler):
         """
         from azure.batch import models as batchmodels
 
-        task_id = os.path.basename(self.script)
+        if 'id' in self.task_definition:
+            task_id = self.task_definition.get('id')
+        else:
+            task_id = os.path.basename(self.script)
+        display_name = self.task_definition.get('displayName', task_id)
 
-        print('Adding {} tasks to job [{}]...'.format(task_id, job_id))
+        logging.info('Adding {} tasks to job [{}]...'.format(task_id, job_id))
 
         container_settings = batchmodels.TaskContainerSettings(
             image_name=self.image,
@@ -334,6 +339,11 @@ class AzureBatchScheduler(BaseBatchSchduler):
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONNECTION_STRING', value=platform['storage_connection_string']),
             batchmodels.EnvironmentSetting(name='BLOB_NAME', value=self.script_target_name),
         ]
+
+        if 'environmentSettings' in self.task_definition and self.task_definition['environmentSettings'] is not None:
+            environment_settings.extend([
+                batchmodels.EnvironmentSetting(**setting) for setting in self.task_definition['environmentSettings']
+            ])
 
         constraints = None
         if 'constraints' in self.task_definition and self.task_definition['constraints']:
@@ -352,7 +362,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         task = batchmodels.TaskAddParameter(
             id=task_id,
-            display_name=task_id,
+            display_name=display_name,
             command_line=self.task_definition['commandLine'],
             constraints=constraints[0],
             container_settings=container_settings,
@@ -361,7 +371,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
         )
 
         for validation in task.validate():
-            print(validation)
+            logging.info(validation)
 
         self.batch_client.task.add(job_id=job_id, task=task)
 
@@ -405,6 +415,9 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
     @retry(tries=3, delay=1)
     def upload_script(self):
+        if not self.script:
+            return
+
         with open(self.script, 'rb') as data:
             self.container_client.upload_blob(
                 name=self.script_target_name,
