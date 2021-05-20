@@ -18,6 +18,11 @@ aws configure
 ```
 It will ask for `Access key ID` and `Secret access key`. This credential will be used for all resources on AWS. See more instructions [here](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-quickstart.html).
 
+Follow instructions [here](https://docs.aws.amazon.com/batch/latest/userguide/service_IAM_role.html) to create the
+AWS Batch Service Role.
+
+Follow instructions [here](https://docs.aws.amazon.com/batch/latest/userguide/instance_IAM_role.html) to create the
+AWS ECS Instance Role. Additionally, make sure that the instance has read/write accesss to the Input/Output buckets.
 
 ### Getting started on Azure Batch
 Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) and login:
