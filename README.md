@@ -21,7 +21,7 @@ pip install CloudHummingbird
 
 It is recommended to use the ```--install-option="--prefix=$PREFIX_PATH"``` along with pip while installing Hummingbird. This would give users easy access to the sample configuration files located in conf/examples which the users might need to refer to while writing their own configuration file(s) for their own computational pipeline. Alternatively, the configuration files can be found here: ```<virtualenv_name>/lib/<python_ver>/site-packages/Hummingbird/conf/examples```
 
-Hummingbird requires pip and python 2.7 or python 3 as prerequesites for installation.
+Hummingbird requires pip and python 3 as prerequesites for installation.
 
 It is highly recommended to use a [virtual environment](https://packaging.python.org/guides/installing-using-pip-and-virtual-environments/) to isolate the execution environment. Please follow the instructions from the above link to create a virtual environment, and then activate it:
 ```
