@@ -13,6 +13,11 @@
 For jobs specified using Azure, Hummingbird will launch jobs using Azure Batch.  
 You will need to prepare for a customized Docker Image including the Azure CLI for your applications. This tutorial will include the instructions and preparation steps for your jobs.
 
+## Use published Docker Image
+See [Hummingbird GitHub Packages](https://github.com/orgs/StanfordBioinformatics/packages?tab=packages&q=azure&repo_name=Hummingbird) for latest Docker Images.
+
+If you need to use your private container registry or require custom packages, see below.
+
 
 ## Build your Docker image
 This repository provides a sample `Dockerfile` and a `fetch_and_run.sh` script to help you create the customized Docker image. We will go through line by line for each step.
