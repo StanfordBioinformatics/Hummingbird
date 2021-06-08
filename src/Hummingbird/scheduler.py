@@ -67,7 +67,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.batch_client = boto3.client('batch')
         super(AWSBatchScheduler, self).__init__()
 
-    def update_laungch_template(self):
+    def update_launch_template(self):
         basesize = str(self.disk_size) + 'G'
         startup_script = Template(self.startup_script_template).substitute(basesize=basesize)
         payload = MIMEText(startup_script, 'cloud-boothook')
@@ -82,20 +82,20 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = self.disk_size
             data['LaunchTemplateData']['UserData'] = user_data_base64
 
-        #subprocess.call(['aws', 'ec2', 'delete-launch-template', '--launch-template-name', 'hummingbird_disk_launch_template'])
-        subprocess.call(['aws', 'ec2', '--region', 'us-west-2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
+        subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
 
     def create_compute_environment(self):
         env_name = self.compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
         output = subprocess.check_output(['aws', 'batch', 'describe-compute-environments', '--compute-environments', env_name])
         desc_json = json.loads(output)
-        if desc_json['computeEnvironments']: # Create if not exist
+        if desc_json['computeEnvironments']:  # Create if not exist
             return env_name
 
         with open('AWS/compute_environment.json') as f:
             data = json.load(f)
             data['computeEnvironmentName'] = env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
+
         subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
 
         while True:
@@ -121,10 +121,10 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['priority'] = 100
             subprocess.call(['aws', 'batch', 'create-job-queue', '--cli-input-json', json.dumps(data)])
         time.sleep(1)
+
         return job_queue_name
 
-    def reg_job_def(self):
-        # subprocess.call(['aws', 'batch', 'deregister-job-definition', '--job-definition', 'hummingbird-job:1'])
+    def create_job_def(self):
         with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
@@ -132,8 +132,9 @@ class AWSBatchScheduler(BaseBatchSchduler):
         subprocess.call(['aws', 'batch', 'register-job-definition', '--cli-input-json', json.dumps(data)])
 
     def submit_job(self, tries=1):
-        #self.update_laungch_template()
+        self.update_launch_template()
         job_queue_name = self.update_job_queue(self.create_compute_environment())
+        self.create_job_def()
 
         jobname = os.path.basename(self.script)
         s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'

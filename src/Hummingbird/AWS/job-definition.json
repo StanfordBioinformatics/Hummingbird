@@ -2,7 +2,7 @@
     "jobDefinitionName": "hummingbird-job",
     "type": "container",
     "containerProperties": {
-        "image": "docker.pkg.github.com/stanfordbioinformatics/hummingbird/bwa:1.0",
+        "image": "cloudhummingbird/bwa:1.0",
         "vcpus": 0,
         "memory": 0,
         "command": [
@@ -10,7 +10,7 @@
             "-c",
             "/usr/local/bin/aws_fetch_and_run.sh"
         ],
-        "jobRoleArn": "arn:aws:iam::834110226206:role/ecsTaskExecutionRole",
+        "jobRoleArn": "<ecsTaskExecutionRole>",
         "volumes": [
         ],
         "environment": [
