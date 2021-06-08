@@ -8,7 +8,7 @@
         "command": [
             "/bin/bash",
             "-c",
-            "/usr/local/bin/azure_fetch_and_run.sh"
+            "/usr/local/bin/aws_fetch_and_run.sh"
         ],
         "jobRoleArn": "arn:aws:iam::834110226206:role/ecsTaskExecutionRole",
         "volumes": [
