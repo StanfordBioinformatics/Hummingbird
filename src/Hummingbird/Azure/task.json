@@ -1,7 +1,7 @@
 [
   {
-    "image": "amiralavi/hummingbird-azure:v4",
-    "commandLine": "/bin/bash -c '/usr/local/bin/fetch_and_run.sh'",
+    "image": "docker.pkg.github.com/stanfordbioinformatics/hummingbird/bwa:1.0",
+    "commandLine": "/bin/bash -c '/usr/local/bin/azure_fetch_and_run.sh'",
     "constraints": {
       "maxWallClockTime": "P4D",
       "maxTaskRetryCount": 1,
