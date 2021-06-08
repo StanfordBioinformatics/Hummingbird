@@ -22,7 +22,7 @@
   },
   "Profiling": [
     {
-      "image": "xingziye/bwa-gatk:fetch_and_run",
+      "image": "docker.pkg.github.com/stanfordbioinformatics/hummingbird/bwa:1.0",
       "result": "result/bwa",
       "thread": [8, 16, 32],
       "input-recursive": {

@@ -125,7 +125,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
     def reg_job_def(self):
         # subprocess.call(['aws', 'batch', 'deregister-job-definition', '--job-definition', 'hummingbird-job:1'])
-        with open('AWS/job-defination.json') as f:
+        with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024

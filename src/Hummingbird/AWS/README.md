@@ -3,7 +3,7 @@
 For jobs specified using AWS, Hummingbird will launch jobs using AWS Batch. You will need to prepare for a customized docker image including the AWS CLI for your applications. This tutorial will include the instructions and preparation steps for your jobs.
 
 ## Use published Docker Image
-See [Hummingbird GitHub Packages](https://github.com/orgs/StanfordBioinformatics/packages?tab=packages&q=aws&repo_name=Hummingbird) for latest Docker Images.
+See [Hummingbird GitHub Packages](https://github.com/orgs/StanfordBioinformatics/packages?tab=packages&repo_name=Hummingbird) for latest Docker Images.
 
 If you need to use your private container registry or require custom packages, see below.
 
