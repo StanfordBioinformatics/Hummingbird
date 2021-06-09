@@ -96,8 +96,6 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['computeEnvironmentName'] = env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
-            if self.image:
-                data['computeResources']['image'] = self.image
 
         subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
 
@@ -132,6 +130,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
+            if self.image:
+                data['containerProperties']['image'] = self.image
         subprocess.call(['aws', 'batch', 'register-job-definition', '--cli-input-json', json.dumps(data)])
 
     def submit_job(self, tries=1):
