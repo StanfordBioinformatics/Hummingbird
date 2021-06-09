@@ -96,7 +96,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['computeEnvironmentName'] = env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
-            if image:
+            if self.image:
                 data['computeResources']['image'] = self.image
 
         subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
