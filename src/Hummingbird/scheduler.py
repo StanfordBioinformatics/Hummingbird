@@ -59,11 +59,12 @@ cloud-init-per once docker_options echo 'OPTIONS="$${OPTIONS} --storage-opt dm.b
 
 
 class AWSBatchScheduler(BaseBatchSchduler):
-    def __init__(self, conf, machine, disk_size, script):
+    def __init__(self, conf, machine, disk_size, script, **kwargs):
         self.conf = conf
         self.machine = machine
         self.disk_size = disk_size
         self.script = script
+        self.image = kwargs.get('image')
         self.batch_client = boto3.client('batch')
         super(AWSBatchScheduler, self).__init__()
 
@@ -79,7 +80,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
         with open('AWS/launch-template-data.json') as f:
             data = json.load(f)
-            data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = self.disk_size
+            data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = str(self.disk_size)
             data['LaunchTemplateData']['UserData'] = user_data_base64
 
         subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
@@ -95,6 +96,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['computeEnvironmentName'] = env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
+            if image:
+                data['computeResources']['image'] = self.image
 
         subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
 
@@ -172,14 +175,14 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
 
 class AzureBatchScheduler(BaseBatchSchduler):
-    def __init__(self, conf, machine, disk_size, script):
+    def __init__(self, conf, machine, disk_size, script, **kwargs):
         self.conf = conf
         self.machine = machine
         self.disk_size = disk_size
         self.script = script
         self.script_target_name = os.path.basename(self.script) + '.sh' if script else None
         self.task_definition = self._get_task_definition()
-        self.image = self.task_definition['image']
+        self.image = kwargs.get('image', self.task_definition['image'])
         self.batch_client = self._get_azure_batch_client(conf)
         self.container_client = self._get_azure_container_client(conf)
         super(AzureBatchScheduler, self).__init__()

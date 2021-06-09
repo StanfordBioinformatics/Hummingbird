@@ -256,7 +256,8 @@ class Profiler(object):
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
-                    scheduler = AWSBatchScheduler(self.conf, machine, disk_size, job_script.name)
+                    image = self.conf[PROFILING].get('image')
+                    scheduler = AWSBatchScheduler(self.conf, machine, disk_size, job_script.name, image=image)
                     job = scheduler.submit_job(tries)
                     jobs.append(job)
                     time.sleep(1)
@@ -376,7 +377,8 @@ class Profiler(object):
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
-                    scheduler = AzureBatchScheduler(self.conf, machine, disk_size, job_script.name)
+                    image = self.conf[PROFILING].get('image')
+                    scheduler = AzureBatchScheduler(self.conf, machine, disk_size, job_script.name, image=image)
                     job_info = scheduler.submit_job(tries=tries)
                     job_info['result_path'] = result_path
                     jobs.append(job_info)
