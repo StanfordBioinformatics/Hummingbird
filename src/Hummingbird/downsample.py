@@ -172,7 +172,6 @@ class Downsample(object):
         scheduler.add_argument('--logging', log_path)
         scheduler.add_argument('--machine-type', Downsample.default_instance)
         scheduler.add_argument('--disk-size', Downsample.default_disk_size)
-        # scheduler.add_argument('--boot-disk-size', '50')
         scheduler.add_argument('--wait')
         if not self.conf[DOWNSAMPLE].get('force', False):
             scheduler.add_argument('--skip')
@@ -227,7 +226,8 @@ class Downsample(object):
 
         ds_script.seek(0)
         machine = AWSInstance('r4.xlarge')
-        scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name)
+        image = self.conf[DOWNSAMPLE].get('image')
+        scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
         jobname = scheduler.submit_job()
         AWSBatchScheduler.wait_jobs([jobname])
         return downsampled
@@ -283,7 +283,8 @@ class Downsample(object):
 
         ds_script.seek(0)
         machine = AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[8][-1])
-        scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name)
+        image = self.conf[DOWNSAMPLE].get('image')
+        scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
         job_info = scheduler.submit_job()
         scheduler.wait_for_tasks_to_complete([job_info['job_id']])
         return downsampled
