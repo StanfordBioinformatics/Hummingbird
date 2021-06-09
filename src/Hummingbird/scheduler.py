@@ -80,7 +80,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
         with open('AWS/launch-template-data.json') as f:
             data = json.load(f)
-            data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = str(self.disk_size)
+            data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = int(self.disk_size)
             data['LaunchTemplateData']['UserData'] = user_data_base64
 
         subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
