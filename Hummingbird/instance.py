@@ -1,5 +1,5 @@
-from __future__ import print_function
-from __future__ import unicode_literals
+#!/usr/bin/env python3
+
 import json
 import subprocess
 import sqlite3

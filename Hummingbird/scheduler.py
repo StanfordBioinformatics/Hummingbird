@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 from datetime import datetime, timedelta
 from typing import List
@@ -20,8 +22,9 @@ import time
 import os
 import logging
 
-from Hummingbird.hummingbird_utils import *
-from Hummingbird.instance import *
+from .hummingbird_utils import *
+from .instance import *
+
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""

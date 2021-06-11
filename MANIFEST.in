@@ -2,14 +2,14 @@ include pyproject.toml
 
 include LICENSE.txt
 
-include src/Hummingbird/conf/examples/*
+include Hummingbird/conf/examples/*
 
-include src/Hummingbird/AWS/*
+include Hummingbird/AWS/*
 
-include src/Hummingbird/*.md
+include Hummingbird/*.md
 
-include src/Hummingbird/*.conf
+include Hummingbird/*.conf
 
-include src/Hummingbird/plot/*
+include Hummingbird/plot/*
 
-include src/Hummingbird/Azure/*
+include Hummingbird/Azure/*

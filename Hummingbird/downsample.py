@@ -1,11 +1,14 @@
+#!/usr/bin/env python3
+
 import os
 import csv
 import sys
 import tempfile
 from collections import defaultdict
-from Hummingbird.scheduler import *
-from Hummingbird.hummingbird_utils import *
-from Hummingbird.instance import *
+from .scheduler import *
+from .hummingbird_utils import *
+from .instance import *
+
 
 class Downsample(object):
     """Generate subsamples for input data.
