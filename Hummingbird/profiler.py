@@ -1,3 +1,5 @@
+# !/usr/bin/env python3
+
 import copy
 import csv
 import json
@@ -16,9 +18,9 @@ try:
 except ImportError:
     from urllib.parse import unquote  # python3
 
-from Hummingbird.instance import *
-from Hummingbird.scheduler import *
-from Hummingbird.hummingbird_utils import *
+from .instance import *
+from .scheduler import *
+from .hummingbird_utils import *
 
 MACHINE_TYPE_PREFIX = 'n1-highmem-'
 DEFAULT_THREAD = 8

@@ -8,4 +8,4 @@ plot/*.pdf
 *.pem
 build/
 dist/
-src/CloudHummingbird.egg-info/
+CloudHummingbird.egg-info/

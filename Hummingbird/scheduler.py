@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 from datetime import datetime, timedelta
 from typing import List
@@ -20,8 +22,9 @@ import time
 import os
 import logging
 
-from Hummingbird.hummingbird_utils import *
-from Hummingbird.instance import *
+from .hummingbird_utils import *
+from .instance import *
+
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
@@ -126,6 +129,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         return job_queue_name
 
     def create_job_def(self):
+        data = {}
         with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
@@ -133,11 +137,12 @@ class AWSBatchScheduler(BaseBatchSchduler):
             if self.image:
                 data['containerProperties']['image'] = self.image
         subprocess.call(['aws', 'batch', 'register-job-definition', '--cli-input-json', json.dumps(data)])
+        return data.get('jobDefinitionName', self.job_def_name)
 
     def submit_job(self, tries=1):
         self.update_launch_template()
         job_queue_name = self.update_job_queue(self.create_compute_environment())
-        self.create_job_def()
+        job_definition_name = self.create_job_def()
 
         jobname = os.path.basename(self.script)
         s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'
@@ -150,7 +155,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
                                {"name": "BATCH_FILE_S3_URL", "value": s3_path}]
         arguments = ['aws', 'batch', 'submit-job', '--job-name', jobname,
                      '--job-queue', job_queue_name,
-                     '--job-definition', self.job_def_name,
+                     '--job-definition', job_definition_name,
                      '--container-overrides', json.dumps(data)]
         if tries > 1:
             array_properties = {"size": tries}

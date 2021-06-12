@@ -17,7 +17,7 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
 
 RUN git clone https://github.com/lh3/seqtk.git && cd seqtk && make install
 
-COPY src/scripts/ /usr/local/bin/
+COPY scripts/ /usr/local/bin/
 WORKDIR /tmp
 
 ENTRYPOINT ["/usr/local/bin/fetch_and_run.sh"]

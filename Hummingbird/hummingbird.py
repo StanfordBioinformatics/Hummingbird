@@ -1,4 +1,5 @@
-from __future__ import division, print_function
+#!/usr/bin/env python3
+
 from builtins import input
 from pprint import pformat
 import argparse

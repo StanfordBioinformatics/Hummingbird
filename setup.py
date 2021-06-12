@@ -5,22 +5,6 @@ here = pathlib.Path(__file__).parent.resolve()
 
 long_description = (here / 'README.md').read_text(encoding='utf-8')
 
-_DEPENDENCIES = [
-        'dsub==0.3.6',
-        'future==0.18.2',
-        'configparser==5.0.0',
-        'scipy==1.5.2',
-        'numpy==1.19.1',
-        'matplotlib==3.3.0',
-        'scikit-learn==0.23.2',
-        'google-cloud-storage==1.30.0',
-        'boto3==1.14.38',
-        'azure-storage-blob==12.6.0',
-        'azure-identity==1.5.0',
-        'azure-batch==10.0.0',
-        'azure-mgmt-compute==18.0.0',
-        'retry==0.9.2',
-]
 setup(
         name='CloudHummingbird',
         version='1.0.2',
@@ -36,21 +20,36 @@ setup(
             'License :: OSI Approved :: Apache Software License',
             'Programming Language :: Python :: 3.6',
             'Programming Language :: Python :: 3.7',
-            'Programming Language :: Python :: 3.8',
-            'Programming Language :: Python :: 3.9'
+            'Programming Language :: Python :: 3.8'
         ],
-        package_dir={'': 'src'},
-        packages=find_packages(where='src'),
         python_requires='>=3.6, <4',
-        install_requires = _DEPENDENCIES,
+        install_requires=[
+            'dsub==0.3.6',
+            'future==0.18.2',
+            'configparser==5.0.0',
+            'scipy==1.5.2',
+            'numpy==1.19.1',
+            'matplotlib==3.3.0',
+            'scikit-learn==0.23.2',
+            'google-cloud-storage==1.30.0',
+            'boto3==1.14.38',
+            'azure-storage-blob==12.6.0',
+            'azure-identity==1.5.0',
+            'azure-batch==10.0.0',
+            'azure-mgmt-compute==18.0.0',
+            'retry==0.9.2',
+        ],
         include_package_data=True,
+        packages=find_packages(
+            exclude=('docs', 'scripts')
+        ),
         package_data={
-            'Hummingbird':['conf/examples/*'],
-            'Hummingbird':['AWS/*'],
-            'Hummingbird':['Azure/*'],
-            'Hummingbird':['*.md'],
-            'Hummingbird':['plot/*'],
-            'Hummingbird':['*.conf'],
+            'Hummingbird': ['conf/examples/*'],
+            'Hummingbird': ['AWS/*'],
+            'Hummingbird': ['Azure/*'],
+            'Hummingbird': ['*.md'],
+            'Hummingbird': ['plot/*'],
+            'Hummingbird': ['*.conf'],
         },
         entry_points={
             'console_scripts': [

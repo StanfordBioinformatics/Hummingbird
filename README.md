@@ -28,40 +28,40 @@ It is highly recommended to use a [virtual environment](https://packaging.python
 source <virtual-environment-name>/bin/activate
 ```
 
-## Section 1: [Getting Started on Google Cloud, AWS Batch, Azure Batch](./GettingStarted.md)
+## Section 1: [Getting Started on Google Cloud, AWS Batch, Azure Batch](./docs/GettingStarted.md)
 This section explains how to get started on Google Cloud, AWS and Azure.
 
-## Section 2: [Sample Run on Google Cloud](./SampleRun.md)
+## Section 2: [Sample Run on Google Cloud](./docs/SampleRun.md)
 This section provides instructions to execute a sample run of BWA on Google Cloud using Hummingbird
 
-## Section 3: [Editing the Configuration File](./EditConf.md)
+## Section 3: [Editing the Configuration File](./docs/EditConf.md)
 This section provides information about the configuration file and how to edit it
 
-## Section 4: [Executing Hummingbird](./ExecHummingbird.md)
+## Section 4: [Executing Hummingbird](./docs/ExecHummingbird.md)
 This section provides information about how to execute Hummingbird
 
-## Section 5: [Hummingbird Result](./HummingbirdResult.md)
+## Section 5: [Hummingbird Result](./docs/HummingbirdResult.md)
 This section provides a guide to interpret the results provided by Hummingbird
 
-## Section 6: [Using Different Input File Formats and Tools for Format Conversions](./FormatConv.md)
+## Section 6: [Using Different Input File Formats and Tools for Format Conversions](./docs/FormatConv.md)
 This section provides a guide for users who want to leverage the downsampling step in Hummingbird but have input files in formats different than BAM or fastq/fastq.gz
 
-## Section 7: [Alternative Downsampling Methods](./AltDownsampling.md)
+## Section 7: [Alternative Downsampling Methods](./docs/AltDownsampling.md)
 This section provides users a guide to alternative downsampling techniques other than the ones supported by Hummingbird
 
-## Section 8: [Workflow Parser](./WorkflowParser.md)
+## Section 8: [Workflow Parser](./docs/WorkflowParser.md)
 This section explains how Hummingbird parses workflows provided by the user
 
-## Section 9: [Container Technology](./ContainerTech.md)
+## Section 9: [Container Technology](./docs/ContainerTech.md)
 This section explains how Hummingbird takes advantage of the container technology for execution
 
-## Section 10: [I/O Profiling](./IOProfiling.md)
+## Section 10: [I/O Profiling](./docs/IOProfiling.md)
 This section explains how future versions of Hummingbird will profile I/O throughput as well
 
-## Section 11: [Fault Tolerance](./FaultTolerance.md)
+## Section 11: [Fault Tolerance](./docs/FaultTolerance.md)
 This section describes the fault tolerant capabilities of Hummingbird
 
-## Section 12: [Requirements for Running Hummingbird on Cloud Platform](./CloudProviderRequirements.md)
+## Section 12: [Requirements for Running Hummingbird on Cloud Platform](./docs/CloudProviderRequirements.md)
 This section lists all required components for running Hummingbird on a Cloud Platform provider.
 
 * Logo Credit: Camille Berry
