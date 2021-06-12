@@ -17,7 +17,7 @@ class Instance:
             region = conf['Platform']['regions']
             return GCPInstance.get_machine_types(region, cpu_list, min_mem)
         elif service == 'aws':
-            return AWSInstance.get_machine_types(['r4', 'r5'], cpu_list, min_mem)
+            return AWSInstance.get_machine_types(['r5', 'm5', 'c5', 'i3'], cpu_list, min_mem)
         elif service in ['azure', 'az']:
             return AzureInstance.get_machine_types(conf, cpu_list, min_mem)
 
@@ -132,18 +132,33 @@ AND CPUS = ? '''
 
 
 class AWSInstance(Instance):
-    thread_suffix = {2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge'}
-    pricing = {'r4.large': 0.133,
-               'r4.xlarge': 0.266,
-               'r4.2xlarge': 0.532,
-               'r4.4xlarge': 1.064,
-               'r4.8xlarge': 2.128,
-               'r5.large': 0.126,
-               'r5.xlarge': 0.252,
-               'r5.2xlarge': 0.504,
-               'r5.4xlarge': 1.008,
-               'r5.8xlarge': 2.016,
-               }
+    thread_suffix = {2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 39: '.9xlarge'}
+    # TODO dynamically fetch instance pricing. e.g.:
+    #   aws pricing get-products --service-code AmazonEC2 \
+    #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \
+    #       "Type=TERM_MATCH,Field=location,Value=US East (N. Virginia)"
+    pricing = {
+        'r5.large': 0.126,
+        'r5.xlarge': 0.252,
+        'r5.2xlarge': 0.504,
+        'r5.4xlarge': 1.008,
+        'r5.8xlarge': 2.016,
+        'm5.large': 0.096,
+        'm5.xlarge': 0.192,
+        'm5.2xlarge': 0.384,
+        'm5.4xlarge': 0.768,
+        'm5.8xlarge': 1.536,
+        'c5.large': 0.085,
+        'c5.xlarge': 0.17,
+        'c5.2xlarge': 0.34,
+        'c5.4xlarge': 0.68,
+        'c5.9xlarge': 1.53,
+        'i3.large': 0.156,
+        'i3.xlarge': 0.312,
+        'i3.2xlarge': 0.624,
+        'i3.4xlarge': 1.248,
+        'i3.8xlarge': 2.496,
+    }
 
     def __init__(self, name=None, cpu=None, mem=None):
         if name is None and (cpu is None or mem is None):

@@ -228,7 +228,7 @@ class Downsample(object):
             return downsampled
 
         ds_script.seek(0)
-        machine = AWSInstance('r4.xlarge')
+        machine = AWSInstance(next(type for type in AWSInstance.pricing if type.endswith(AWSInstance.thread_suffix[4])))
         image = self.conf[DOWNSAMPLE].get('image')
         scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
         jobname = scheduler.submit_job()
