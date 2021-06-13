@@ -10,6 +10,7 @@ import sys
 
 from Hummingbird.downsample import Downsample
 from Hummingbird.profiler import Profiler
+from Hummingbird import validator
 from Hummingbird.instance import *
 from Hummingbird.hummingbird_utils import *
 
@@ -32,7 +33,14 @@ def main():
         config = json.load(config_file)
         config[DOWNSAMPLE]['tool'] = args.downsample_tool
 
-    logging.basicConfig(format='%(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
+    logging.basicConfig(format='%(levelname)-8s :: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
+
+    try:
+        validator.validate_config_file(config)
+    except validator.ConfigurationError as e:
+        logging.error(e)
+        return
+
     logging.info('Preparing downsampling...')
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
