@@ -99,6 +99,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['computeEnvironmentName'] = env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
+            if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
+                del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
 
         subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
 
