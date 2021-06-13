@@ -68,7 +68,7 @@ def main():
 
         all_valid = set()
         all_invalid = set()
-        thread_list = workflow.get('thread', [4])
+        thread_list = workflow.get('thread', [2])
         predictor = Predictor(target, thread_list)
         for task in profiling_dict:
             print('==', task, '==')
@@ -94,7 +94,6 @@ def main():
                     print(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
         all_valid.difference_update(all_invalid)
         cus = input('Do you want to include customized machine types? [y/N]: ')
-        #cus = 'no'
         if cus.lower() == 'y' or cus.lower() == 'yes':
             cus_types = []
             while True:
@@ -120,7 +119,7 @@ def main():
             ds_size = int(target * Downsample.runtime_frac * multiplier)
         while True:
             logging.info('Current downsample size: %s', str(ds_size))
-            runtimes_dict = profiler.profile({ds_size:ds_dict[ds_size]}, all_valid)
+            runtimes_dict = profiler.profile({ds_size: ds_dict[ds_size]}, all_valid)
             logging.info('Runtime profiling done.')
             logging.info(pformat(runtimes_dict))
             for task in runtimes_dict:
@@ -147,6 +146,9 @@ def main():
                 break
             multiplier *= 10
             ds_size = int(target * Downsample.runtime_frac * multiplier)
+            if ds_size not in ds_dict:
+                logging.warning(f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
+                break
 
 
 if __name__ == "__main__":

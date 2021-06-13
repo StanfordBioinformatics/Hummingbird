@@ -22,8 +22,7 @@ from .instance import *
 from .scheduler import *
 from .hummingbird_utils import *
 
-MACHINE_TYPE_PREFIX = 'n1-highmem-'
-DEFAULT_THREAD = 8
+DEFAULT_VCPU = 2  # profiler's thread == vCPU in the current implementation
 
 
 class Profiler(object):
@@ -124,9 +123,9 @@ class Profiler(object):
 
         if machines is None: # do nothing with empty list
             machines = list()
-            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
-                machines.append(GCPInstance(MACHINE_TYPE_PREFIX + str(thread)))
+                machines.append(GCPInstance('n1-highmem-' + str(thread)))
         tries = self.conf[PROFILING].get('tries', 1)
         if tries > 1:
             # Apply parallel processing
@@ -174,7 +173,7 @@ class Profiler(object):
     def aws_batch_profile(self, input_dict, machines):
         if machines is None: # do nothing with empty list
             machines = list()
-            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
                 machines.append(AWSInstance('r5' + AWSInstance.thread_suffix[thread]))
         tries = self.conf[PROFILING].get('tries', 1)
@@ -220,6 +219,7 @@ class Profiler(object):
                 else:
                     for line in self.conf[PROFILING]['command'].splitlines():
                         sub_line = Template(line).safe_substitute(local_name_dict)
+
                         job_script.write('/usr/bin/time -a -f "%e %M" -o result.txt ' + sub_line + '\n')
                 job_script.write("awk '{print $1}' result.txt > time_result.txt\n")
                 job_script.write("awk '{print $2}' result.txt > mem_result.txt\n")
@@ -272,7 +272,7 @@ class Profiler(object):
     def az_batch_profile(self, input_dict, machines):
         if machines is None:  # do nothing with empty list
             machines = list()
-            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
                 machines.append(AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[int(thread)][-1]))
         tries = self.conf[PROFILING].get('tries', 1)
@@ -442,7 +442,7 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             scheduler = Scheduler('dsub', self.conf)
             scheduler.add_argument('--script', dsub_script.name)
             tsv_filename = os.path.join(temp, 'cromwell_profiling_' + machine.name + '.tsv')
-            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_THREAD])
+            thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             json_inputs = self.conf[PROFILING]['json_input'][thread_list.index(machine.cpu)]
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')

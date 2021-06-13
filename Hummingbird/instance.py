@@ -12,7 +12,7 @@ class Instance:
     def get_machine_types(conf, min_mem):
         service = conf['Platform']['service']
         service = service.lower()
-        cpu_list = conf['Profiling'].get('thread', [4])
+        cpu_list = conf['Profiling'].get('thread', [2])
         if service in ['google', 'gcp']:
             region = conf['Platform']['regions']
             return GCPInstance.get_machine_types(region, cpu_list, min_mem)
@@ -158,7 +158,7 @@ AND CPUS = ? '''
 
 
 class AWSInstance(Instance):
-    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 39: '.9xlarge'}
+    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge'}
     # TODO dynamically fetch instance pricing. e.g.:
     #   aws pricing get-products --service-code AmazonEC2 \
     #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \
@@ -175,11 +175,11 @@ class AWSInstance(Instance):
         'm5.2xlarge': 0.384,
         'm5.4xlarge': 0.768,
         'm5.8xlarge': 1.536,
-        'c5.large': 0.085,
-        'c5.xlarge': 0.17,
-        'c5.2xlarge': 0.34,
-        'c5.4xlarge': 0.68,
-        'c5.9xlarge': 1.53,
+        'c5a.large': 0.077,
+        'c5a.xlarge': 0.154,
+        'c5a.2xlarge': 0.308,
+        'c5a.4xlarge': 0.616,
+        'c5a.8xlarge': 1.232,
         'i3.large': 0.156,
         'i3.xlarge': 0.312,
         'i3.2xlarge': 0.624,
