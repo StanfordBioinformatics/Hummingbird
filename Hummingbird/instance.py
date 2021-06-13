@@ -17,7 +17,7 @@ class Instance:
             region = conf['Platform']['regions']
             return GCPInstance.get_machine_types(region, cpu_list, min_mem)
         elif service == 'aws':
-            return AWSInstance.get_machine_types(['r5', 'm5', 'c5', 'i3'], cpu_list, min_mem)
+            return AWSInstance.get_machine_types(['r5', 'm5', 'c5a', 'i3'], cpu_list, min_mem)
         elif service in ['azure', 'az']:
             return AzureInstance.get_machine_types(conf, cpu_list, min_mem)
 
