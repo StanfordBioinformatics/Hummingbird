@@ -48,6 +48,24 @@ class Instance:
     def get_core(self):
         return str(self.cpu)
 
+    @staticmethod
+    def check_threads_supported(threads, service):
+        if service in ['google', 'gcp']:
+            return GCPInstance.check_threads_supported(threads)
+        elif service == 'aws':
+            return AWSInstance.check_threads_supported(threads)
+        elif service in ['azure', 'az']:
+            return AzureInstance.check_threads_supported(threads)
+
+    @staticmethod
+    def get_supported_threads(service):
+        if service in ['google', 'gcp']:
+            return GCPInstance.get_supported_threads()
+        elif service == 'aws':
+            return AWSInstance.get_supported_threads()
+        elif service in ['azure', 'az']:
+            return AzureInstance.get_supported_threads()
+
 
 class GCPInstance(Instance):
     pricing = {
@@ -130,14 +148,23 @@ AND CPUS = ? '''
         else:
             Instance.__init__(self, 'custom', cpu, mem)
 
+    @staticmethod
+    def check_threads_supported(threads):
+        return set(threads).issubset(GCPInstance.get_supported_threads())
+
+    @staticmethod
+    def get_supported_threads():
+        return set([int(key.rpartition('-')[-1]) for key in GCPInstance.pricing.keys()])
+
 
 class AWSInstance(Instance):
-    thread_suffix = {2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 39: '.9xlarge'}
+    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 39: '.9xlarge'}
     # TODO dynamically fetch instance pricing. e.g.:
     #   aws pricing get-products --service-code AmazonEC2 \
     #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \
     #       "Type=TERM_MATCH,Field=location,Value=US East (N. Virginia)"
     pricing = {
+        't2.micro': 0.0116,
         'r5.large': 0.126,
         'r5.xlarge': 0.252,
         'r5.2xlarge': 0.504,
@@ -195,9 +222,18 @@ class AWSInstance(Instance):
                     invalid.append(ins)
         return valid, invalid
 
+    @staticmethod
+    def check_threads_supported(threads):
+        return set(threads).issubset(AWSInstance.get_supported_threads())
+
+    @staticmethod
+    def get_supported_threads():
+        return set(AWSInstance.thread_suffix.keys())
+
 
 class AzureInstance(Instance):
     pricing = {
+        'Standard_B1s': 0.0113,
         'Standard_E2_v3': 0.126,
         'Standard_E4_v3': 0.252,
         'Standard_E8_v3': 0.504,
@@ -211,6 +247,7 @@ class AzureInstance(Instance):
     }
 
     machine_thread_mapping = {
+        1: ['Standard_B1s'],
         2: ['Standard_E2_v3', 'Standard_D2_v3'],
         4: ['Standard_E4_v3', 'Standard_D4_v3'],
         8: ['Standard_E8_v3', 'Standard_D8_v3'],
@@ -281,3 +318,11 @@ class AzureInstance(Instance):
     @staticmethod
     def filter_machine(conf, location, machine_name):
         return AzureInstance.filter_machines(conf, location, [machine_name])[0]
+
+    @staticmethod
+    def check_threads_supported(threads):
+        return set(threads).issubset(AzureInstance.get_supported_threads())
+
+    @staticmethod
+    def get_supported_threads():
+        return set(AzureInstance.machine_thread_mapping.keys())
