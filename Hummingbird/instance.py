@@ -17,7 +17,7 @@ class Instance:
             region = conf['Platform']['regions']
             return GCPInstance.get_machine_types(region, cpu_list, min_mem)
         elif service == 'aws':
-            return AWSInstance.get_machine_types(['r5', 'm5', 'c5a', 'i3'], cpu_list, min_mem)
+            return AWSInstance.get_machine_types(AWSInstance.instance_families, cpu_list, min_mem)
         elif service in ['azure', 'az']:
             return AzureInstance.get_machine_types(conf, cpu_list, min_mem)
 
@@ -158,7 +158,8 @@ AND CPUS = ? '''
 
 
 class AWSInstance(Instance):
-    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge'}
+    instance_families = ['c5', 'c5a', 'c5d', 'c5ad', 'm5', 'r5', 'i3']
+    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 36: '.9xlarge'}
     # TODO dynamically fetch instance pricing. e.g.:
     #   aws pricing get-products --service-code AmazonEC2 \
     #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \
@@ -175,11 +176,26 @@ class AWSInstance(Instance):
         'm5.2xlarge': 0.384,
         'm5.4xlarge': 0.768,
         'm5.8xlarge': 1.536,
+        'c5.large': 0.085,
+        'c5.xlarge': 0.17,
+        'c5.2xlarge': 0.34,
+        'c5.4xlarge': 0.68,
+        'c5.9xlarge': 1.53,
         'c5a.large': 0.077,
         'c5a.xlarge': 0.154,
         'c5a.2xlarge': 0.308,
         'c5a.4xlarge': 0.616,
         'c5a.8xlarge': 1.232,
+        'c5d.large': 0.096,
+        'c5d.xlarge': 0.192,
+        'c5d.2xlarge': 0.384,
+        'c5d.4xlarge': 0.768,
+        'c5d.9xlarge': 1.728,
+        'c5ad.large': 0.086,
+        'c5ad.xlarge': 0.172,
+        'c5ad.2xlarge': 0.344,
+        'c5ad.4xlarge': 0.688,
+        'c5ad.8xlarge': 1.376,
         'i3.large': 0.156,
         'i3.xlarge': 0.312,
         'i3.2xlarge': 0.624,
