@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import tempfile
+import logging
 import time
 from collections import defaultdict
 from multiprocessing import Pool
@@ -22,6 +23,8 @@ from .instance import *
 from .scheduler import *
 from .hummingbird_utils import *
 
+
+logger = logging.getLogger('hummingbird')
 DEFAULT_VCPU = 2  # profiler's thread == vCPU in the current implementation
 
 
@@ -91,7 +94,7 @@ class Profiler(object):
                     for t in range(tries):
                         obj = self.client.get_object(Bucket=bucket_name, Key=dir_prefix+'try'+str(t)+'.txt')
                         value = json.loads(obj['Body'].read())
-                        print(t, value)
+                        logger.debug(t, value)
                         total += value
                     profiling_dict['script'][entry_count].append(total/tries)
             return profiling_dict
@@ -150,12 +153,12 @@ class Profiler(object):
         bucket = self.client.get_bucket(self.conf[PLATFORM]['bucket'])
         profiling_dict = dict()
         for result_dict in result_dicts:
-            print(result_dict)
+            logger.info(result_dict)
             for entry_count in result_dict:
                 dir_list = result_dict[entry_count]
                 for i, dir_prefix in enumerate(dir_list):
                     blobs = list(bucket.list_blobs(prefix=dir_prefix))
-                    print(blobs)
+                    logger.info(blobs)
                     for blob in blobs: # blobs are named as task.txt
                         res_set = float(blob.download_as_string())
                         basename = os.path.basename(unquote(blob.path))
@@ -163,7 +166,7 @@ class Profiler(object):
                         if taskname not in profiling_dict:
                             profiling_dict[taskname] = defaultdict(lambda :[0] * len(dir_list))
                         profiling_dict[taskname][entry_count][i] += res_set / tries
-                        print(taskname, entry_count, res_set)
+                        logger.info(taskname, entry_count, res_set)
         return profiling_dict
 
     @retry(tries=5, delay=1, max_delay=5, logger=None)
@@ -254,7 +257,7 @@ class Profiler(object):
                     Prefix=result_path+'try')
                 if len(response.get('Contents', [])) >= tries and not self.conf[PROFILING].get('force', False):
                     job_script.close()
-                    print("Result files exist. Job skiped.")
+                    logger.info("Result files exist. Job skiped.")
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
@@ -375,7 +378,7 @@ class Profiler(object):
                     for blob in blobs:
                         jobs.append({'pool_id': blob.metadata['pool'], 'job_id': blob.metadata['job'],
                                      'task_id': blob.metadata['task'], 'result_path': result_path})
-                    print("Result files exist. Job skipped.")
+                    logger.info("Result files exist. Job skipped.")
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)

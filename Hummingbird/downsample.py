@@ -4,10 +4,14 @@ import os
 import csv
 import sys
 import tempfile
+import logging
 from collections import defaultdict
 from .scheduler import *
 from .hummingbird_utils import *
 from .instance import *
+
+
+logger = logging.getLogger('hummingbird')
 
 
 class Downsample(object):
@@ -70,7 +74,6 @@ class Downsample(object):
             elif self.conf[PLATFORM]['service'] == 'aws':
                 downsampled.update(self.downsample_by_type_aws(type_dict[type], type))
             elif self.conf[PLATFORM]['service'] == 'azure':
-                import logging
                 logging.getLogger('azure').setLevel(logging.WARNING)
                 downsampled.update(self.downsample_by_type_azure(type_dict[type], type))
         return downsampled
@@ -224,7 +227,7 @@ class Downsample(object):
                     skip = False
 
         if skip:
-            print("Downsampled files exist, skip downsampling.")
+            logger.info("Downsampled files exist, skip downsampling.")
             return downsampled
 
         ds_script.seek(0)
@@ -281,7 +284,7 @@ class Downsample(object):
                     skip = False
 
         if skip:
-            print("Downsampled files exist, skip downsampling.")
+            logger.info("Downsampled files exist, skip downsampling.")
             return downsampled
 
         ds_script.seek(0)

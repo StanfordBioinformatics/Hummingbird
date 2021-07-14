@@ -26,6 +26,9 @@ from .hummingbird_utils import *
 from .instance import *
 
 
+logger = logging.getLogger('hummingbird')
+
+
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
     def __init__(self, tool, conf):
@@ -401,7 +404,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
         timeout_expiration = datetime.now() + timeout
 
-        print("Monitoring all tasks for 'Completed' state, timeout in {}...".format(timeout), end='')
+        logger.info("Monitoring all tasks for 'Completed' state, timeout in {}...".format(timeout), end='')
 
         while datetime.now() < timeout_expiration:
             completed_jobs = 0

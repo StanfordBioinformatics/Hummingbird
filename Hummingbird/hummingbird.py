@@ -15,6 +15,14 @@ from Hummingbird.instance import *
 from Hummingbird.hummingbird_utils import *
 
 
+logging.basicConfig(
+    format='%(levelname)-8s :: %(asctime)s: %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+    level=logging.INFO
+)
+logger = logging.getLogger('hummingbird')
+
+
 def main():
     """The main pipeline."""
     parser = argparse.ArgumentParser()
@@ -33,18 +41,16 @@ def main():
         config = json.load(config_file)
         config[DOWNSAMPLE]['tool'] = args.downsample_tool
 
-    logging.basicConfig(format='%(levelname)-8s :: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
-
     try:
         validator.validate_config_file(config)
     except validator.ConfigurationError as e:
-        logging.error(e)
+        logger.error(e)
         return
 
-    logging.info('Preparing downsampling...')
+    logger.info('Preparing downsampling...')
     downsampler = Downsample(config)
     ds_dict = downsampler.subsample()
-    logging.info('Downsampling done.')
+    logger.info('Downsampling done.')
 
     target = config[DOWNSAMPLE]['target']
     for i, workflow in enumerate(config[PROFILING]):
@@ -58,40 +64,40 @@ def main():
         else:
             sys.exit('Invalid conf parameters.')
 
-        logging.info('Preparing memory profiling...')
-        logging.info(pformat(ds_dict))
+        logger.info('Preparing memory profiling...')
+        logger.info(pformat(ds_dict))
         wf_conf = {PROFILING: workflow, DOWNSAMPLE: config[DOWNSAMPLE], PLATFORM: config[PLATFORM]}
         profiler = Profiler(backend, args.profile_tool, Profiler.mem_mode, wf_conf)
         profiling_dict = profiler.profile(ds_dict)
-        logging.info('Memory profiling done.')
-        logging.info(profiling_dict)
+        logger.info('Memory profiling done.')
+        logger.info(profiling_dict)
 
         all_valid = set()
         all_invalid = set()
         thread_list = workflow.get('thread', [2])
         predictor = Predictor(target, thread_list)
         for task in profiling_dict:
-            print('==', task, '==')
+            logger.info('==', task, '==')
             pf_dict = profiling_dict[task]
             predictions = predictor.extrapolate(pf_dict, task)
             for i, t in enumerate(thread_list):
-                print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
+                logger.info('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
                 reserved_mem = 2
             min_mem = [pred/1000/1000 + reserved_mem for pred in predictions]
             valid, invalid = Instance.get_machine_types(wf_conf, min_mem)
             all_valid.update(valid)
             all_invalid.update(invalid)
             if valid:
-                print('Sugguest to test on the following machine types:')
+                logger.info('Sugguest to test on the following machine types:')
                 for ins in valid:
-                    print(bcolors.OKGREEN + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
+                    logger.info(bcolors.OKGREEN + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
                     ins.set_price()
             else:
-                print('No pre-defined machine types found.')
+                logger.info('No pre-defined machine types found.')
             if invalid:
-                print('Machine types might not have enouph memory and will be pruned:')
+                logger.info('Machine types might not have enouph memory and will be pruned:')
                 for ins in invalid:
-                    print(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
+                    logger.warning(bcolors.FAIL + ins.name + bcolors.ENDC, str(ins.mem) + 'GB')
         all_valid.difference_update(all_invalid)
         cus = input('Do you want to include customized machine types? [y/N]: ')
         if cus.lower() == 'y' or cus.lower() == 'yes':
@@ -106,10 +112,10 @@ def main():
                 ins.set_price()
             all_valid.update(cus_types)
 
-        logging.info(all_valid)
+        logger.info(all_valid)
         # if len(all_valid) <= 1:
         #     continue
-        logging.info('Preparing runtime profiling...')
+        logger.info('Preparing runtime profiling...')
         profiler.mode = Profiler.time_mode
 
         multiplier = 1
@@ -118,12 +124,12 @@ def main():
         else:
             ds_size = int(target * Downsample.runtime_frac * multiplier)
         while True:
-            logging.info('Current downsample size: %s', str(ds_size))
+            logger.info('Current downsample size: %s', str(ds_size))
             runtimes_dict = profiler.profile({ds_size: ds_dict[ds_size]}, all_valid)
-            logging.info('Runtime profiling done.')
-            logging.info(pformat(runtimes_dict))
+            logger.info('Runtime profiling done.')
+            logger.info(pformat(runtimes_dict))
             for task in runtimes_dict:
-                print('==' + task + '==')
+                logger.info('==' + task + '==')
                 runtimes = runtimes_dict[task][ds_size]
                 zipped_runtimes = [(t,m) for t, m in zip(runtimes, all_valid) if t]
                 runtimes, succeeded = [], []
@@ -147,7 +153,7 @@ def main():
             multiplier *= 10
             ds_size = int(target * Downsample.runtime_frac * multiplier)
             if ds_size not in ds_dict:
-                logging.warning(f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
+                logger.warning(f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
                 break
 
 
