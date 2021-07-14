@@ -231,12 +231,22 @@ class AWSInstance(Instance):
         valid, invalid = [], []
         for family in families:
             for cpu, mem in zip(cpu_list, min_mem):
-                ins = AWSInstance(family + AWSInstance.thread_suffix[cpu])
+                ins = AWSInstance(AWSInstance.match_instance_type(family, cpu))
                 if ins.mem >= mem:
                     valid.append(ins)
                 else:
                     invalid.append(ins)
         return valid, invalid
+
+    @staticmethod
+    def match_instance_type(family, cpu):
+        instance_type = family + AWSInstance.thread_suffix.get(cpu, '')
+        # if the current instance is not supported for the thread specified, get the next one
+        # this can happen for instances such as c5d.9xlarge where there is no c5d.8xlarge
+        if instance_type not in AWSInstance.pricing and cpu < 36:
+            instance_type = AWSInstance.match_instance_type(family, cpu + 1)
+
+        return instance_type
 
     @staticmethod
     def check_threads_supported(threads):
