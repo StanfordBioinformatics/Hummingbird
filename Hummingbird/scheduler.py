@@ -89,15 +89,17 @@ class AWSBatchScheduler(BaseBatchSchduler):
         subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
 
     def create_compute_environment(self):
-        env_name = self.compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
-        output = subprocess.check_output(['aws', 'batch', 'describe-compute-environments', '--compute-environments', env_name])
-        desc_json = json.loads(output)
-        if desc_json['computeEnvironments']:  # Create if not exist
-            return env_name
-
         with open('AWS/compute_environment.json') as f:
             data = json.load(f)
-            data['computeEnvironmentName'] = env_name
+
+            compute_env_prefix = data.get('computeEnvironmentName', self.compute_env_prefix)
+            env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
+            output = subprocess.check_output(['aws', 'batch', 'describe-compute-environments', '--compute-environments', env_name])
+            desc_json = json.loads(output)
+            if desc_json['computeEnvironments']:
+                return env_name
+
+            data['computeEnvironmentName'] = compute_env_prefix
             data['computeResources']['instanceTypes'].append(self.machine.name)
             if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
                 del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
@@ -131,7 +133,6 @@ class AWSBatchScheduler(BaseBatchSchduler):
         return job_queue_name
 
     def create_job_def(self):
-        data = {}
         with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
