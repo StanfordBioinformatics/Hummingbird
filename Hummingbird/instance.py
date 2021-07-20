@@ -235,7 +235,11 @@ class AWSInstance(Instance):
         valid, invalid = [], []
         for family in families:
             for cpu, mem in zip(cpu_list, min_mem):
-                ins = AWSInstance(AWSInstance.match_instance_type(family, cpu))
+                instance_type = AWSInstance.match_instance_type(family, cpu)
+                if not AWSInstance.is_instance_valid(instance_type):
+                    continue
+
+                ins = AWSInstance(instance_type)
                 if ins.mem >= mem:
                     valid.append(ins)
                 else:
@@ -247,7 +251,7 @@ class AWSInstance(Instance):
         instance_type = family + AWSInstance.thread_suffix.get(cpu, '')
         # if the current instance is not supported for the thread specified, get the next one
         # this can happen for instances such as c5d.9xlarge where there is no c5d.8xlarge
-        if instance_type not in AWSInstance.pricing and cpu < 36:
+        if not AWSInstance.is_instance_valid(instance_type) and cpu < 36:
             instance_type = AWSInstance.match_instance_type(family, cpu + 1)
 
         return instance_type
@@ -263,6 +267,10 @@ class AWSInstance(Instance):
     @staticmethod
     def get_instance_families():
         return set([ins.split('.')[0] for ins in AWSInstance.pricing.keys() if ins != 't2.micro'])
+
+    @staticmethod
+    def is_instance_valid(instance_type):
+        return instance_type and instance_type in AWSInstance.pricing
 
 
 class AzureInstance(Instance):

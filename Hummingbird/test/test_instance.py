@@ -24,3 +24,9 @@ class TestAWSInstance(unittest.TestCase):
         families = AWSInstance.get_instance_families()
 
         self.assertEqual({'m5', 'r5', 'c5', 'c5a', 'c5d', 'c5ad', 'i3'}, families)
+
+    def test_is_instance_valid(self):
+        self.assertTrue(AWSInstance.is_instance_valid('c5.xlarge'))
+
+    def test_is_instance_not_valid(self):
+        self.assertFalse(AWSInstance.is_instance_valid('c5.999xlarge'))
