@@ -93,13 +93,15 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
 
             compute_env_prefix = data.get('computeEnvironmentName', self.compute_env_prefix)
-            env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
-            output = subprocess.check_output(['aws', 'batch', 'describe-compute-environments', '--compute-environments', env_name])
+            compute_env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
+            output = subprocess.check_output(
+                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
+            )
             desc_json = json.loads(output)
             if desc_json['computeEnvironments']:
-                return env_name
+                return compute_env_name
 
-            data['computeEnvironmentName'] = compute_env_prefix
+            data['computeEnvironmentName'] = compute_env_name
             data['computeResources']['instanceTypes'].append(self.machine.name)
             if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
                 del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
@@ -108,11 +110,13 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
         while True:
             time.sleep(1)
-            output = subprocess.check_output(['aws', 'batch', 'describe-compute-environments', '--compute-environments', env_name])
+            output = subprocess.check_output(
+                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
+            )
             desc_json = json.loads(output)
             if desc_json['computeEnvironments']:
                 break
-        return env_name
+        return compute_env_name
 
     def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'

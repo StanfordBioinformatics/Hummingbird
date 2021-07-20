@@ -41,7 +41,7 @@ setup(
         ],
         include_package_data=True,
         packages=find_packages(
-            exclude=('docs', 'scripts')
+            exclude=('docs', 'scripts', 'Hummingbird/test')
         ),
         package_data={
             'Hummingbird': ['conf/examples/*'],

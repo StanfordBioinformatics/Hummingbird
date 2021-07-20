@@ -175,6 +175,9 @@ class Profiler(object):
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
+                if thread not in AWSInstance.thread_suffix:
+                    logging.warning("Skipping thread '%d' for AWS as it is not supported", thread)
+                    continue
                 machines.append(AWSInstance('r5' + AWSInstance.thread_suffix[thread]))
         tries = self.conf[PROFILING].get('tries', 1)
 
@@ -544,10 +547,12 @@ class BashProfiler(BaseProfiler):
         # each machine type will have an individual tsv
         procs = []
         temp = tempfile.mkdtemp()
+
         def add_headline(flag):
             if flag in self.conf[PROFILING]:
                 for key in self.conf[PROFILING][flag]:
                     headline.append('--' + flag + ' ' + key)
+
         for machine in machines:
             scheduler = Scheduler('dsub', self.conf)
             scheduler.add_argument('--script', dsub_script.name)
