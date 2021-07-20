@@ -17,7 +17,7 @@ class Instance:
             region = conf['Platform']['regions']
             return GCPInstance.get_machine_types(region, cpu_list, min_mem)
         elif service == 'aws':
-            return AWSInstance.get_machine_types(AWSInstance.instance_families, cpu_list, min_mem)
+            return AWSInstance.get_machine_types(AWSInstance.get_instance_families(), cpu_list, min_mem)
         elif service in ['azure', 'az']:
             return AzureInstance.get_machine_types(conf, cpu_list, min_mem)
 
@@ -158,8 +158,7 @@ AND CPUS = ? '''
 
 
 class AWSInstance(Instance):
-    instance_families = ['c5', 'c5a', 'c5d', 'c5ad', 'm5', 'r5', 'i3']
-    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 36: '.9xlarge'}
+    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 36: '.9xlarge', 64: '.16xlarge'}
     # TODO dynamically fetch instance pricing. e.g.:
     #   aws pricing get-products --service-code AmazonEC2 \
     #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \
@@ -171,11 +170,13 @@ class AWSInstance(Instance):
         'r5.2xlarge': 0.504,
         'r5.4xlarge': 1.008,
         'r5.8xlarge': 2.016,
+        'r5.16xlarge': 4.032,
         'm5.large': 0.096,
         'm5.xlarge': 0.192,
         'm5.2xlarge': 0.384,
         'm5.4xlarge': 0.768,
         'm5.8xlarge': 1.536,
+        'm5.16xlarge': 3.072,
         'c5.large': 0.085,
         'c5.xlarge': 0.17,
         'c5.2xlarge': 0.34,
@@ -186,6 +187,7 @@ class AWSInstance(Instance):
         'c5a.2xlarge': 0.308,
         'c5a.4xlarge': 0.616,
         'c5a.8xlarge': 1.232,
+        'c5a.16xlarge': 2.464,
         'c5d.large': 0.096,
         'c5d.xlarge': 0.192,
         'c5d.2xlarge': 0.384,
@@ -196,11 +198,13 @@ class AWSInstance(Instance):
         'c5ad.2xlarge': 0.344,
         'c5ad.4xlarge': 0.688,
         'c5ad.8xlarge': 1.376,
+        'c5ad.16xlarge': 2.752,
         'i3.large': 0.156,
         'i3.xlarge': 0.312,
         'i3.2xlarge': 0.624,
         'i3.4xlarge': 1.248,
         'i3.8xlarge': 2.496,
+        'i3.16xlarge': 4.992,
     }
 
     def __init__(self, name=None, cpu=None, mem=None):
@@ -255,6 +259,10 @@ class AWSInstance(Instance):
     @staticmethod
     def get_supported_threads():
         return set(AWSInstance.thread_suffix.keys())
+
+    @staticmethod
+    def get_instance_families():
+        return set([ins.split('.')[0] for ins in AWSInstance.pricing.keys() if ins != 't2.micro'])
 
 
 class AzureInstance(Instance):
