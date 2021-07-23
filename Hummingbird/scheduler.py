@@ -15,7 +15,6 @@ except ImportError:
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 from string import Template
-import boto3
 import json
 import subprocess
 import time
@@ -68,7 +67,10 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.disk_size = disk_size
         self.script = script
         self.image = kwargs.get('image')
+        import boto3
         self.batch_client = boto3.client('batch')
+        self.ec2_client = boto3.client('ec2')
+        self.s3_bucket = boto3.client('s3').Bucket(self.conf[PLATFORM]['bucket'])
         super(AWSBatchScheduler, self).__init__()
 
     def update_launch_template(self):
@@ -86,7 +88,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = int(self.disk_size)
             data['LaunchTemplateData']['UserData'] = user_data_base64
 
-        subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
+        self.ec2_client.create_launch_template_version(**data)
 
     def create_compute_environment(self):
         with open('AWS/compute_environment.json') as f:
@@ -94,10 +96,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
             compute_env_prefix = data.get('computeEnvironmentName', self.compute_env_prefix)
             compute_env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
-            output = subprocess.check_output(
-                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
-            )
-            desc_json = json.loads(output)
+
+            desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
                 return compute_env_name
 
@@ -106,32 +106,28 @@ class AWSBatchScheduler(BaseBatchSchduler):
             if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
                 del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
 
-        subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
+        self.batch_client.create_compute_environment(**data)
 
-        while True:
+        for _ in range(20):  # try up to 20 times until compute environment is ready
             time.sleep(1)
-            output = subprocess.check_output(
-                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
-            )
-            desc_json = json.loads(output)
+            desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
                 break
         return compute_env_name
 
     def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'
-        output = subprocess.check_output(['aws', 'batch', 'describe-job-queues', '--job-queues', job_queue_name])
-        desc_json = json.loads(output)
+        desc_json = self.batch_client.describe_job_queues(jobQueues=[job_queue_name])
         env = {"order": 1, "computeEnvironment": env_name}
         data = {"computeEnvironmentOrder": [env]}
-        if desc_json['jobQueues']: # Create if not exist
+        if desc_json['jobQueues']:  # Create if not exist
             data["jobQueue"] = job_queue_name
-            subprocess.call(['aws', 'batch', 'update-job-queue', '--cli-input-json', json.dumps(data)])
+            self.batch_client.update_job_queue(**data)
         else:
             data["jobQueueName"] = job_queue_name
             data['state'] = 'ENABLED'
             data['priority'] = 100
-            subprocess.call(['aws', 'batch', 'create-job-queue', '--cli-input-json', json.dumps(data)])
+            self.batch_client.create_job_queue(**data)
         time.sleep(1)
 
         return job_queue_name
@@ -143,7 +139,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
             if self.image:
                 data['containerProperties']['image'] = self.image
-        subprocess.call(['aws', 'batch', 'register-job-definition', '--cli-input-json', json.dumps(data)])
+        self.batch_client.deregister_job_definition(**data)
         return data.get('jobDefinitionName', self.job_def_name)
 
     def submit_job(self, tries=1):
@@ -152,27 +148,31 @@ class AWSBatchScheduler(BaseBatchSchduler):
         job_definition_name = self.create_job_def()
 
         jobname = os.path.basename(self.script)
-        s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'
-        subprocess.call(['aws', 's3', 'cp', self.script, s3_path])
+        s3_path = 'script/' + jobname + '.sh'
+        self.s3_bucket.upload_file(self.script, s3_path)
         data = dict()
         data['vcpus'] = self.machine.cpu
         data['memory'] = int(self.machine.mem * 1024 * 0.9)
         data['command'] = [jobname + '.sh']
-        data['environment'] = [{"name": "BATCH_FILE_TYPE", "value": "script"},
-                               {"name": "BATCH_FILE_S3_URL", "value": s3_path}]
-        arguments = ['aws', 'batch', 'submit-job', '--job-name', jobname,
-                     '--job-queue', job_queue_name,
-                     '--job-definition', job_definition_name,
-                     '--container-overrides', json.dumps(data)]
+        data['environment'] = [
+            {"name": "BATCH_FILE_TYPE", "value": "script"},
+            {"name": "BATCH_FILE_S3_URL", "value": "s3://{}/{}".format(self.conf[PLATFORM]['bucket'], s3_path)}
+        ]
+        arguments = {
+            'jobName': jobname,
+            'jobQueue': job_queue_name,
+            'jobDefinition': job_definition_name,
+            'containerOverrides': data
+        }
         if tries > 1:
-            array_properties = {"size": tries}
-            arguments += ['--array-properties', json.dumps(array_properties)]
-        output = subprocess.check_output(arguments)
-        desc_json = json.loads(output)
+            arguments['arrayProperties'] = {"size": tries}
+
+        desc_json = self.batch_client.submit_job(**arguments)
         return desc_json['jobId']
 
     @staticmethod
     def wait_jobs(jobs_list):
+        import boto3
         client = boto3.client('batch')
         while True:
             finished = True

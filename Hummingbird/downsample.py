@@ -5,6 +5,9 @@ import csv
 import sys
 import tempfile
 from collections import defaultdict
+
+import botocore.errorfactory
+
 from .scheduler import *
 from .hummingbird_utils import *
 from .instance import *
@@ -219,8 +222,12 @@ class Downsample(object):
                 target_path = '/'.join([bucket_dir, output_path, target_file])
                 ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n') # Delocalization
                 downsampled[count_int][key] = target_path
-                output = subprocess.run(['aws', 's3', 'ls', target_path], check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if output.returncode != 0:  # if non-zero status code (i.e. file does not exist), then do not skip
+
+                import boto3
+                s3_client = boto3.client('s3')
+                try:
+                    s3_client.head_object(Bucket=self.conf[PLATFORM]['bucket'], Key='{}/{}'.format(output_path, target_file))
+                except botocore.errorfactory.ClientError:  # if error occurred (i.e. file does not exist), then do not skip
                     skip = False
 
         if skip:

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import json
 import subprocess
 import sqlite3
 
@@ -226,8 +225,10 @@ class AWSInstance(Instance):
 
     @staticmethod
     def desc_instance(name):
-        output = subprocess.check_output(['aws', 'ec2', 'describe-instance-types', '--instance-types', name])
-        desc = json.loads(output)['InstanceTypes'][0]
+        import boto3
+        ec2_client = boto3.client('ec2')
+        response = ec2_client.describe_instance_types(InstanceTypes=[name])
+        desc = response['InstanceTypes'][0]
         return desc['VCpuInfo']['DefaultVCpus'], desc['MemoryInfo']['SizeInMiB'] / 1024
 
     @staticmethod
