@@ -103,19 +103,19 @@ class GCPInstance(Instance):
         machine_types = [line + [None] for line in machine_types if len(line) == 4]
         cur.executemany("INSERT INTO instance VALUES (?,?,?,?,?)", machine_types)
         conn.commit()
-        SQL = '''SELECT DISTINCT NAME, CPUS, MEMORY_GB FROM instance
+        sql_statement = '''SELECT DISTINCT NAME, CPUS, MEMORY_GB FROM instance
 WHERE NAME LIKE ?
 AND ZONE LIKE ?
 AND MEMORY_GB >= ?
 AND CPUS = ? '''
         for cpu, mem in zip(cpu_list, min_mem):
-            cur.execute(SQL, ['n1%', region + '%', mem, cpu])
+            cur.execute(sql_statement, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
                 valid.append(GCPInstance(entry[0], entry[1], entry[2]))
-        SQL = SQL.replace('>=', '<')
+        sql_statement = sql_statement.replace('>=', '<')
         for cpu, mem in zip(cpu_list, min_mem):
-            cur.execute(SQL, ['n1%', region + '%', mem, cpu])
+            cur.execute(sql_statement, ['n1%', region + '%', mem, cpu])
             entries = cur.fetchall()
             for entry in entries:
                 invalid.append(GCPInstance(entry[0], entry[1], entry[2]))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 from datetime import datetime, timedelta
 from typing import List
 
@@ -108,7 +108,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             waiter = self.get_compute_environment_waiter()
             waiter.wait(computeEnvironments=[compute_env_name])
         except botocore.waiter.WaiterError as e:
-            logging.error(e.message)
+            logging.error(e)
             raise e
 
         return compute_env_name
@@ -139,7 +139,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
                 }
             }
         })
-        return botocore.waiter.create_waiter_with_client(waiter_id, model, client)
+        import botocore
+        return botocore.waiter.create_waiter_with_client(waiter_id, model, self.batch_client)
 
     def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'

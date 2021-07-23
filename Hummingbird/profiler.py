@@ -2,23 +2,17 @@
 
 import copy
 import csv
-import json
 import os
 import shutil
 import tempfile
-import time
 from collections import defaultdict
 from multiprocessing import Pool
-from string import Template
-
-from retry import retry
 
 try:
     from urllib import unquote  # python2
 except ImportError:
     from urllib.parse import unquote  # python3
 
-from .instance import *
 from .scheduler import *
 from .hummingbird_utils import *
 

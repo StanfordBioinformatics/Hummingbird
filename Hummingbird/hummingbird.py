@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 
-from builtins import input
-from pprint import pformat
 import argparse
 import json
 import logging
-import math
-import sys
+from builtins import input
+from pprint import pformat
 
-from Hummingbird.downsample import Downsample
-from Hummingbird.profiler import Profiler
 from Hummingbird import validator
-from Hummingbird.instance import *
+from Hummingbird.downsample import Downsample
 from Hummingbird.hummingbird_utils import *
+from Hummingbird.instance import *
+from Hummingbird.profiler import Profiler
 
 
 def main():

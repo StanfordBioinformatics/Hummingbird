@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 
-import os
 import csv
-import sys
+import os
 import tempfile
 from collections import defaultdict
 
 from .scheduler import *
-from .hummingbird_utils import *
-from .instance import *
 
 
 class Downsample(object):
@@ -142,6 +139,7 @@ class Downsample(object):
                 tsv_writer.writerow(row)
 
         scheduler = Scheduler('dsub', self.conf)
+        command = ''
         if not self.fullrun:
             if tool == 'picard':
                 scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')

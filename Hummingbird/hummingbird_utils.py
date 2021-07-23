@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import os
 import sys
+
+import matplotlib
 import numpy as np
 from scipy.interpolate import Rbf, UnivariateSpline
 from sklearn import linear_model
-import matplotlib
+
 matplotlib.use("agg")
 import matplotlib.pyplot as plt
 
