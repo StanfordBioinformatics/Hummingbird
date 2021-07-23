@@ -6,8 +6,6 @@ import sys
 import tempfile
 from collections import defaultdict
 
-import botocore.errorfactory
-
 from .scheduler import *
 from .hummingbird_utils import *
 from .instance import *
@@ -223,11 +221,7 @@ class Downsample(object):
                 ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n') # Delocalization
                 downsampled[count_int][key] = target_path
 
-                import boto3
-                s3_client = boto3.client('s3')
-                try:
-                    s3_client.head_object(Bucket=self.conf[PLATFORM]['bucket'], Key='{}/{}'.format(output_path, target_file))
-                except botocore.errorfactory.ClientError:  # if error occurred (i.e. file does not exist), then do not skip
+                if not self.s3_object_exists(self.conf[PLATFORM]['bucket'], '{}/{}'.format(output_path, target_file)):
                     skip = False
 
         if skip:
@@ -298,3 +292,14 @@ class Downsample(object):
         job_info = scheduler.submit_job()
         scheduler.wait_for_tasks_to_complete([job_info['job_id']])
         return downsampled
+
+    @staticmethod
+    def s3_object_exists(bucket, key):
+        import boto3
+        import botocore.errorfactory
+        s3_client = boto3.client('s3')
+        try:
+            s3_client.head_object(Bucket=bucket, Key=key)
+            return True
+        except botocore.errorfactory.ClientError:  # if error occurred (i.e. file does not exist), then do not skip
+            return False

@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-import sys
 from datetime import datetime, timedelta
 from typing import List
-
-from retry import retry
 
 try:
     from email import encoders
@@ -16,9 +13,7 @@ except ImportError:
     from email.mime.text import MIMEText
 from string import Template
 import json
-import subprocess
 import time
-import os
 import logging
 
 from .hummingbird_utils import *
@@ -108,12 +103,43 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
         self.batch_client.create_compute_environment(**data)
 
-        for _ in range(20):  # try up to 20 times until compute environment is ready
-            time.sleep(1)
-            desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
-            if desc_json['computeEnvironments']:
-                break
+        import botocore.waiter
+        try:
+            waiter = self.get_compute_environment_waiter()
+            waiter.wait(computeEnvironments=[compute_env_name])
+        except botocore.waiter.WaiterError as e:
+            logging.error(e.message)
+            raise e
+
         return compute_env_name
+
+    def get_compute_environment_waiter(self):
+        waiter_id = 'ComputeEnvironmentWaiter'
+        model = self.batch_client.WaiterModel({
+            'version': 2,
+            'waiters': {
+                waiter_id: {
+                    'delay': 1,
+                    'operation': 'DescribeComputeEnvironments',
+                    'maxAttempts': 20,
+                    'acceptors': [
+                        {
+                            'expected': 'VALID',
+                            'matcher': 'pathAll',
+                            'state': 'success',
+                            'argument': 'computeEnvironments[].status'
+                        },
+                        {
+                            'expected': 'INVALID',
+                            'matcher': 'pathAny',
+                            'state': 'failure',
+                            'argument': 'computeEnvironments[].status'
+                        }
+                    ]
+                }
+            }
+        })
+        return botocore.waiter.create_waiter_with_client(waiter_id, model, client)
 
     def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'
