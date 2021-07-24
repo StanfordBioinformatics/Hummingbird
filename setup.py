@@ -7,7 +7,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
         name='CloudHummingbird',
-        version='1.0.2',
+        version='1.1.0',
         description='A tool that recommends the best way to run your genomics pipelines on the cloud',
         long_description=long_description,
         long_description_content_type='text/markdown',

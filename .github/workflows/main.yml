@@ -19,6 +19,6 @@ jobs:
     - name: Build
       run: python setup.py build
     - name: Install all dependencies
-      run: pip install -e '.[tests]' .
+      run: pip install . && pip install -e '.[tests]'
     - name: Run all unit tests
       run: python -m unittest Hummingbird/test/test_*.py
