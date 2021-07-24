@@ -99,7 +99,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
             desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
-                logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists', compute_env_name)
+                logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists',
+                             compute_env_name)
                 return compute_env_name
 
             data['computeEnvironmentName'] = compute_env_name
@@ -221,8 +222,20 @@ class AWSBatchScheduler(BaseBatchSchduler):
         return desc_json['jobId']
 
     def wait_jobs(self, jobs_list):
-        from botocore.waiter import WaiterError, WaiterModel, create_waiter_with_client
+        from botocore.waiter import WaiterError
         waiter_id = '_'.join(jobs_list)
+        logging.info('Waiting for AWS Batch Jobs %s to finish...', jobs_list)
+        try:
+            job_waiter = self.get_compute_job_waiter(waiter_id)
+            job_waiter.wait(jobs=jobs_list)
+        except WaiterError as e:
+            logging.error(e)
+            raise e
+
+        logging.info('AWS Batch Jobs %s have completed', jobs_list)
+
+    def get_compute_job_waiter(self, waiter_id):
+        from botocore.waiter import WaiterModel, create_waiter_with_client
         model = WaiterModel({
             'version': 2,
             'waiters': {
@@ -247,15 +260,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
                 }
             }
         })
-        try:
-            logging.info('Waiting for AWS Batch Jobs %s to finish...', jobs_list)
-            job_waiter = create_waiter_with_client(waiter_id, model, self.batch_client)
-            job_waiter.wait(jobs=jobs_list)
-        except WaiterError as e:
-            logging.error(e)
-            raise e
-
-        logging.info('AWS Batch Jobs %s have completed', jobs_list)
+        return create_waiter_with_client(waiter_id, model, self.batch_client)
 
     def get_compute_job_queue_waiter(self, waiter_id):
         from botocore.waiter import WaiterModel

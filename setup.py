@@ -39,6 +39,9 @@ setup(
             'azure-mgmt-compute==18.0.0',
             'retry==0.9.2',
         ],
+        extras_require={
+            'tests': ['mock']
+        },
         include_package_data=True,
         packages=find_packages(
             exclude=('docs', 'scripts', 'Hummingbird/test')
