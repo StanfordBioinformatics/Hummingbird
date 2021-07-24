@@ -7,7 +7,7 @@ long_description = (here / 'README.md').read_text(encoding='utf-8')
 
 setup(
         name='CloudHummingbird',
-        version='1.0.2',
+        version='1.1.0',
         description='A tool that recommends the best way to run your genomics pipelines on the cloud',
         long_description=long_description,
         long_description_content_type='text/markdown',
@@ -32,13 +32,16 @@ setup(
             'matplotlib==3.3.0',
             'scikit-learn==0.23.2',
             'google-cloud-storage==1.30.0',
-            'boto3==1.14.38',
+            'boto3==1.18.6',
             'azure-storage-blob==12.6.0',
             'azure-identity==1.5.0',
             'azure-batch==10.0.0',
             'azure-mgmt-compute==18.0.0',
             'retry==0.9.2',
         ],
+        extras_require={
+            'tests': ['mock']
+        },
         include_package_data=True,
         packages=find_packages(
             exclude=('docs', 'scripts', 'Hummingbird/test')

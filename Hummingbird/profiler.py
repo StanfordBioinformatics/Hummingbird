@@ -3,8 +3,10 @@
 import copy
 import csv
 import json
+import logging
 import os
 import shutil
+import sys
 import tempfile
 import time
 from collections import defaultdict
@@ -13,14 +15,14 @@ from string import Template
 
 from retry import retry
 
+from .hummingbird_utils import PLATFORM, PROFILING, humanize, DOWNSAMPLE, ZIP_EXT
+from .instance import GCPInstance, AWSInstance, AzureInstance
+from .scheduler import AWSBatchScheduler, AzureBatchScheduler, Scheduler
+
 try:
     from urllib import unquote  # python2
 except ImportError:
     from urllib.parse import unquote  # python3
-
-from .instance import *
-from .scheduler import *
-from .hummingbird_utils import *
 
 DEFAULT_VCPU = 2  # profiler's thread == vCPU in the current implementation
 
@@ -47,7 +49,7 @@ class Profiler(object):
         self.service = conf[PLATFORM]['service']
         if self.service == 'aws':
             import boto3
-            self.client = boto3.client('s3')
+            self.client = boto3.client('s3', region_name=conf[PLATFORM]['regions'])
         elif self.service == 'gcp':
             from google.cloud import storage
             self.client = storage.Client(project=conf[PLATFORM]['project'])
@@ -89,11 +91,11 @@ class Profiler(object):
                 for dir_prefix in dir_list:
                     total = 0.0
                     for t in range(tries):
-                        obj = self.client.get_object(Bucket=bucket_name, Key=dir_prefix+'try'+str(t)+'.txt')
+                        obj = self.client.get_object(Bucket=bucket_name, Key=dir_prefix + 'try' + str(t) + '.txt')
                         value = json.loads(obj['Body'].read())
                         print(t, value)
                         total += value
-                    profiling_dict['script'][entry_count].append(total/tries)
+                    profiling_dict['script'][entry_count].append(total / tries)
             return profiling_dict
         elif self.service == 'azure':
             profiling_dict = dict()
@@ -121,7 +123,7 @@ class Profiler(object):
                         profiling_dict['script'][entry_count].append(total / len(matching_jobs))
             return profiling_dict
 
-        if machines is None: # do nothing with empty list
+        if machines is None:  # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
@@ -137,7 +139,7 @@ class Profiler(object):
                 self._set_profiler(new_conf)
                 results.append(pool.apply_async(self.profiler, (input_dict, machines)))
             try:
-                result_dicts = [r.get() for r in results] # Collecting results
+                result_dicts = [r.get() for r in results]  # Collecting results
             except:
                 pool.terminate()
                 pool.join()
@@ -156,12 +158,12 @@ class Profiler(object):
                 for i, dir_prefix in enumerate(dir_list):
                     blobs = list(bucket.list_blobs(prefix=dir_prefix))
                     print(blobs)
-                    for blob in blobs: # blobs are named as task.txt
+                    for blob in blobs:  # blobs are named as task.txt
                         res_set = float(blob.download_as_string())
                         basename = os.path.basename(unquote(blob.path))
                         taskname, _ = os.path.splitext(basename)
                         if taskname not in profiling_dict:
-                            profiling_dict[taskname] = defaultdict(lambda :[0] * len(dir_list))
+                            profiling_dict[taskname] = defaultdict(lambda: [0] * len(dir_list))
                         profiling_dict[taskname][entry_count][i] += res_set / tries
                         print(taskname, entry_count, res_set)
         return profiling_dict
@@ -171,7 +173,7 @@ class Profiler(object):
         return blob_client.download_blob().readall()
 
     def aws_batch_profile(self, input_dict, machines):
-        if machines is None: # do nothing with empty list
+        if machines is None:  # do nothing with empty list
             machines = list()
             thread_list = self.conf[PROFILING].get('thread', [DEFAULT_VCPU])
             for thread in thread_list:
@@ -184,7 +186,7 @@ class Profiler(object):
         url_base = 's3://' + self.conf[PLATFORM]['bucket'] + '/'
         result_dict = defaultdict(list)
         output_dict = defaultdict(dict)
-        prev_mem = 0 # used to get output from the largest instances
+        prev_mem = 0  # used to get output from the largest instances
         jobs = []
 
         for machine in machines:
@@ -227,8 +229,10 @@ class Profiler(object):
                 job_script.write("awk '{print $1}' result.txt > time_result.txt\n")
                 job_script.write("awk '{print $2}' result.txt > mem_result.txt\n")
 
-                mem_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
-                time_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                mem_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                    str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                time_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                    str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
                 result_path = mem_path if self.mode == Profiler.mem_mode else time_path
                 result_dict[entry_count].append(result_path)
                 mem_addr = url_base + mem_path + 'try$AWS_BATCH_JOB_ARRAY_INDEX.txt'
@@ -248,16 +252,17 @@ class Profiler(object):
                     for key in self.conf[PROFILING]['output-recursive'].keys():
                         path = self.conf[PROFILING]['output-recursive'][key]
                         path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
-                        job_script.write(' '.join(['aws', 's3', 'cp', local_name_dict[key], url_base + path, '--recursive']) + '\n')
+                        job_script.write(
+                            ' '.join(['aws', 's3', 'cp', local_name_dict[key], url_base + path, '--recursive']) + '\n')
                         if machine.mem > prev_mem:
                             output_dict[entry_count][key] = url_base + path
 
                 response = self.client.list_objects_v2(
                     Bucket=self.conf[PLATFORM]['bucket'],
-                    Prefix=result_path+'try')
+                    Prefix=result_path + 'try')
                 if len(response.get('Contents', [])) >= tries and not self.conf[PROFILING].get('force', False):
                     job_script.close()
-                    print("Result files exist. Job skiped.")
+                    logging.info('Result files exist. Job skipped.')
                 else:
                     job_script.seek(0)
                     disk_size = self.conf[PROFILING].get('disk', Profiler.default_disk_size)
@@ -268,7 +273,7 @@ class Profiler(object):
                     time.sleep(1)
             prev_mem = machine.mem
         if jobs:
-            AWSBatchScheduler.wait_jobs(jobs)
+            AWSBatchScheduler(self.conf, None, None, None).wait_jobs(jobs)
         self.output_dict = output_dict
         return result_dict
 
@@ -303,7 +308,8 @@ class Profiler(object):
                     for key, path in self.conf[PROFILING]['input'].items():
                         local_name_dict[key] = path
                         job_script.write(' '.join(['az', 'storage', 'blob', 'download',
-                                                   '--container-name', storage_container, '--name', path, '--file', path,
+                                                   '--container-name', storage_container, '--name', path, '--file',
+                                                   path,
                                                    '--account-name', storage_account]) + '\n')
                 if 'input-recursive' in self.conf[PROFILING]:
                     for key, path in self.conf[PROFILING]['input-recursive'].items():
@@ -367,7 +373,8 @@ class Profiler(object):
                         path += '_' + str(machine.get_core()) + '_' + humanize(str(entry_count))
                         job_script.write(' '.join([
                             'az', 'storage', 'blob', 'upload-batch', '--destination', storage_container,
-                            '--source', local_name_dict[key], '--destination-path', path, '--account-name', storage_account,
+                            '--source', local_name_dict[key], '--destination-path', path, '--account-name',
+                            storage_account,
                             '--metadata', metadata]) + '\n')
                         if machine.mem > prev_mem:
                             output_dict[entry_count][key] = path
@@ -466,13 +473,16 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
                     # if entry_count not in input_dict:
                     #     continue
                     json_input = bucket_base + json_input
-                    mem_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
-                    time_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                    mem_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                        str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                    time_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                        str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
                     result_path = mem_path if self.mode == Profiler.mem_mode else time_path
                     result_dict[entry_count].append(result_path)
                     mem_result = bucket_base + mem_path
                     time_result = bucket_base + time_path
-                    output_dir = bucket_base + self.conf[PROFILING]['output'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/'
+                    output_dir = bucket_base + self.conf[PROFILING]['output'] + '/' + humanize(
+                        str(entry_count)) + '/' + machine.name + '/'
                     row = [backend_conf, wdl_file, json_input, mem_result, time_result, output_dir]
                     if import_zip:
                         row += [import_zip]
@@ -481,7 +491,8 @@ find /mnt/data/final_outputs -type f -execdir cp {} ${OUTPUT_DIR} \;
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
-            scheduler.add_argument('--boot-disk-size', Profiler.default_boot_disk_size) # google providers put the Docker container's /tmp directory on the boot disk, 10 GB by defualt
+            scheduler.add_argument('--boot-disk-size',
+                                   Profiler.default_boot_disk_size)  # google providers put the Docker container's /tmp directory on the boot disk, 10 GB by defualt
             scheduler.add_argument('--disk-size', self.conf[PROFILING].get('disk', Profiler.default_disk_size))
             scheduler.add_argument('--wait')
             if not self.conf[PROFILING].get('force', False):
@@ -518,10 +529,10 @@ class BashProfiler(BaseProfiler):
         """
         url_base = 'gs://' + self.conf[PLATFORM]['bucket'] + '/'
         log_path = url_base + self.conf[PROFILING]['logging']
-        dsub_script = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
+        dsub_script = tempfile.NamedTemporaryFile(mode='w')  # 'w' mode for python3 csv.writer
         result_dict = defaultdict(list)
         output_dict = defaultdict(dict)
-        prev_mem = 0 # used to get output from the largest instances
+        prev_mem = 0  # used to get output from the largest instances
 
         # Prepare profiling script
         # dsub_script.write('echo "deb [check-valid-until=no] http://cdn-fastly.deb.debian.org/debian jessie main" > /etc/apt/sources.list.d/jessie.list\n')
@@ -560,19 +571,21 @@ class BashProfiler(BaseProfiler):
             with open(tsv_filename, 'w') as dsub_tsv:
                 tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
                 headline = ['--env THREAD', '--output RUNTIME_RESULT', '--output RSS_RESULT']
-                any_count, any_input_dict = input_dict.popitem() # Pick an arbitrary element to get keys including index and put item back
+                any_count, any_input_dict = input_dict.popitem()  # Pick an arbitrary element to get keys including index and put item back
                 input_dict[any_count] = any_input_dict
                 for key in any_input_dict.keys():
                     headline.append('--input ' + key)
-                add_headline('input') # additional inputs for profiling stage
+                add_headline('input')  # additional inputs for profiling stage
                 add_headline('input-recursive')
                 add_headline('output')
                 add_headline('output-recursive')
                 tsv_writer.writerow(headline)
 
                 for entry_count in input_dict:
-                    mem_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
-                    time_path = self.conf[PROFILING]['result'] + '/' + humanize(str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
+                    mem_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                        str(entry_count)) + '/' + machine.name + '/' + Profiler.mem_mode + '/'
+                    time_path = self.conf[PROFILING]['result'] + '/' + humanize(
+                        str(entry_count)) + '/' + machine.name + '/' + Profiler.time_mode + '/'
                     result_path = mem_path if self.mode == Profiler.mem_mode else time_path
                     result_dict[entry_count].append(result_path)
                     mem_addr = url_base + mem_path + 'script.txt'
@@ -614,7 +627,7 @@ class BashProfiler(BaseProfiler):
             scheduler.add_argument('--tasks', tsv_filename)
             scheduler.add_argument('--logging', log_path)
             scheduler.add_argument('--machine-type', machine.name)
-            scheduler.add_argument('--boot-disk-size', Profiler.default_boot_disk_size) # 10 GB by defualt
+            scheduler.add_argument('--boot-disk-size', Profiler.default_boot_disk_size)  # 10 GB by defualt
             scheduler.add_argument('--disk-size', self.conf[PROFILING].get('disk', Profiler.default_disk_size))
             scheduler.add_argument('--wait')
             if not self.conf[PROFILING].get('force', False):

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 
-from builtins import input
-from pprint import pformat
 import argparse
 import json
 import logging
-import math
 import sys
+from builtins import input
+from pprint import pformat
 
-from Hummingbird.downsample import Downsample
-from Hummingbird.profiler import Profiler
 from Hummingbird import validator
-from Hummingbird.instance import *
-from Hummingbird.hummingbird_utils import *
+from Hummingbird.downsample import Downsample
+from Hummingbird.hummingbird_utils import DOWNSAMPLE, PROFILING, PLATFORM, Predictor, bcolors, speedup_efficiency, \
+    cost_efficiency
+from Hummingbird.instance import Instance, GCPInstance
+from Hummingbird.profiler import Profiler
 
 
 def main():
@@ -33,7 +33,8 @@ def main():
         config = json.load(config_file)
         config[DOWNSAMPLE]['tool'] = args.downsample_tool
 
-    logging.basicConfig(format='%(levelname)-8s :: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
+    logging.basicConfig(format='%(levelname)-8s :: %(asctime)s: %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p',
+                        level=logging.INFO)
 
     try:
         validator.validate_config_file(config)
@@ -77,7 +78,7 @@ def main():
             for i, t in enumerate(thread_list):
                 print('The memory usage for {:,} reads with {:>2} threads is predicted as {:,.0f} Kbytes.'.format(target, t, predictions[i]))
                 reserved_mem = 2
-            min_mem = [pred/1000/1000 + reserved_mem for pred in predictions]
+            min_mem = [pred / 1000 / 1000 + reserved_mem for pred in predictions]
             valid, invalid = Instance.get_machine_types(wf_conf, min_mem)
             all_valid.update(valid)
             all_invalid.update(invalid)
@@ -125,29 +126,32 @@ def main():
             for task in runtimes_dict:
                 print('==' + task + '==')
                 runtimes = runtimes_dict[task][ds_size]
-                zipped_runtimes = [(t,m) for t, m in zip(runtimes, all_valid) if t]
+                zipped_runtimes = [(t, m) for t, m in zip(runtimes, all_valid) if t]
                 runtimes, succeeded = [], []
                 for t, m in zipped_runtimes:
                     runtimes.append(t)
                     succeeded.append(m)
                 speedups = speedup_efficiency(zipped_runtimes)
-                sorted_runtimes = sorted(zipped_runtimes, key=lambda x:x[0])
+                sorted_runtimes = sorted(zipped_runtimes, key=lambda x: x[0])
                 prices = [ins.price for ins in succeeded]
                 costs = [t * p for t, p in zip(runtimes, prices)]
                 sorted_costs = sorted(zip(costs, succeeded))
                 efficiencies = cost_efficiency(runtimes, costs)
                 sorted_efficiencies = sorted(zip(efficiencies, succeeded), reverse=True)
-                print('The fastest machine type: {}'.format(bcolors.OKGREEN + sorted_runtimes[0][1].name + bcolors.ENDC))
+                print(
+                    'The fastest machine type: {}'.format(bcolors.OKGREEN + sorted_runtimes[0][1].name + bcolors.ENDC))
                 print('The cheapest machine type: {}'.format(bcolors.OKGREEN + sorted_costs[0][1].name + bcolors.ENDC))
-                print('The most cost-efficient machine type: {}'.format(bcolors.OKGREEN + sorted_efficiencies[0][1].name + bcolors.ENDC))
+                print('The most cost-efficient machine type: {}'.format(
+                    bcolors.OKGREEN + sorted_efficiencies[0][1].name + bcolors.ENDC))
             if ds_size >= int(target * 0.1) or input("Try larger downsample size? [Y/n]") == 'n':
-                if profiler.output_dict is not None: # CromwellProfiler returns None output_dict
-                    ds_dict = profiler.output_dict # update downsampled input as output from previous workflow
+                if profiler.output_dict is not None:  # CromwellProfiler returns None output_dict
+                    ds_dict = profiler.output_dict  # update downsampled input as output from previous workflow
                 break
             multiplier *= 10
             ds_size = int(target * Downsample.runtime_frac * multiplier)
             if ds_size not in ds_dict:
-                logging.warning(f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
+                logging.warning(
+                    f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
                 break
 
 

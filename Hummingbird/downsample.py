@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 
-import os
 import csv
+import logging
+import os
 import sys
 import tempfile
 from collections import defaultdict
-from .scheduler import *
-from .hummingbird_utils import *
-from .instance import *
+
+from .hummingbird_utils import DOWNSAMPLE, ZIP_EXT, FA_EXT, FQ_EXT, SAM_EXT, BAM_EXT, BAM, SAM, FQ, FA, PLATFORM, \
+    humanize
+from .instance import AWSInstance, AzureInstance
+from .scheduler import Scheduler, AWSBatchScheduler, AzureBatchScheduler
 
 
 class Downsample(object):
@@ -103,7 +106,7 @@ class Downsample(object):
         log_path = bucket_dir + '/' + self.conf[DOWNSAMPLE]['logging']
         downsampled = defaultdict(dict)
 
-        dsub_tsv = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
+        dsub_tsv = tempfile.NamedTemporaryFile(mode='w')  # 'w' mode for python3 csv.writer
         tsv_writer = csv.writer(dsub_tsv, delimiter='\t')
         row = ['--env COUNT', '--input INPUT_FILE']
         if not self.fullrun:
@@ -125,14 +128,14 @@ class Downsample(object):
                 downsampled[count_int][key] = target_path
                 if tool in ['picard', 'samtools', 'seqtk']:
                     row = [frac, input_path]
-                else: # zless
+                else:  # zless
                     row = [frac * 4, input_path]
                 if not self.fullrun:
                     row.append(target_path)
                 if self.index:
                     if type == BAM:
                         ext = '.bai'
-                    else: # fasta and fastq
+                    else:  # fasta and fastq
                         ext = '.fai'
                     idx_key = key + '_IDX'
                     index_path = target_path + ext
@@ -141,6 +144,7 @@ class Downsample(object):
                 tsv_writer.writerow(row)
 
         scheduler = Scheduler('dsub', self.conf)
+        command = ''
         if not self.fullrun:
             if tool == 'picard':
                 scheduler.add_argument('--image', 'xingziye/seqdownsample:latest')
@@ -204,12 +208,12 @@ class Downsample(object):
         downsampled = defaultdict(dict)
         skip = True
 
-        ds_script = tempfile.NamedTemporaryFile(mode='w') # 'w' mode for python3 csv.writer
+        ds_script = tempfile.NamedTemporaryFile(mode='w')  # 'w' mode for python3 csv.writer
 
         for key in key_file_dict:
             input_path = key_file_dict[key]
             local_name = os.path.basename(input_path)
-            ds_script.write(' '.join(['aws', 's3', 'cp', input_path, local_name]) + '\n') # Localization
+            ds_script.write(' '.join(['aws', 's3', 'cp', input_path, local_name]) + '\n')  # Localization
             base, extension = os.path.splitext(input_path)
             while extension in ZIP_EXT:
                 base, extension = os.path.splitext(base)
@@ -217,14 +221,14 @@ class Downsample(object):
                 target_file = os.path.basename(base) + '_' + tool + '_' + humanize(count_int) + extension
                 ds_script.write(' '.join(['seqtk', 'sample', local_name, str(frac), '>', target_file]) + '\n')
                 target_path = '/'.join([bucket_dir, output_path, target_file])
-                ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n') # Delocalization
+                ds_script.write(' '.join(['aws', 's3', 'cp', target_file, target_path]) + '\n')  # Delocalization
                 downsampled[count_int][key] = target_path
-                output = subprocess.run(['aws', 's3', 'ls', target_path], check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                if output.returncode != 0:  # if non-zero status code (i.e. file does not exist), then do not skip
+
+                if not self.s3_object_exists(self.conf[PLATFORM]['bucket'], '{}/{}'.format(output_path, target_file)):
                     skip = False
 
         if skip:
-            print("Downsampled files exist, skip downsampling.")
+            logging.info("Downsampled files exist, skip downsampling.")
             return downsampled
 
         ds_script.seek(0)
@@ -232,7 +236,7 @@ class Downsample(object):
         image = self.conf[DOWNSAMPLE].get('image')
         scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
         jobname = scheduler.submit_job()
-        AWSBatchScheduler.wait_jobs([jobname])
+        scheduler.wait_jobs([jobname])
         return downsampled
 
     def downsample_by_type_azure(self, key_file_dict, type):
@@ -241,7 +245,6 @@ class Downsample(object):
             return {self.conf[DOWNSAMPLE]['target']: key_file_dict}
 
         if type == SAM or type == BAM:
-            tool = Downsample.default_sam_tool
             sys.exit('SAM/BAM Downsample is unsupported in Azure')
         else:
             tool = Downsample.default_fa_tool
@@ -281,7 +284,7 @@ class Downsample(object):
                     skip = False
 
         if skip:
-            print("Downsampled files exist, skip downsampling.")
+            logging.info("Downsampled files exist, skip downsampling.")
             return downsampled
 
         ds_script.seek(0)
@@ -291,3 +294,14 @@ class Downsample(object):
         job_info = scheduler.submit_job()
         scheduler.wait_for_tasks_to_complete([job_info['job_id']])
         return downsampled
+
+    @staticmethod
+    def s3_object_exists(bucket, key):
+        import boto3
+        import botocore.errorfactory
+        s3_client = boto3.client('s3')
+        try:
+            s3_client.head_object(Bucket=bucket, Key=key)
+            return True
+        except botocore.errorfactory.ClientError:  # if error occurred (i.e. file does not exist), then do not skip
+            return False

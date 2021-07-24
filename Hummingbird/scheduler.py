@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 
+import json
+import logging
+import os
+import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
+from string import Template
 from typing import List
 
 from retry import retry
+
+from .hummingbird_utils import PLATFORM
 
 try:
     from email import encoders
@@ -14,20 +22,11 @@ except ImportError:
     from email import encoders
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
-from string import Template
-import boto3
-import json
-import subprocess
-import time
-import os
-import logging
-
-from .hummingbird_utils import *
-from .instance import *
 
 
 class Scheduler(object):
     """Dsub scheduler construction and execution."""
+
     def __init__(self, tool, conf):
         self.tool = tool
         if self.tool == 'dsub':
@@ -68,7 +67,10 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.disk_size = disk_size
         self.script = script
         self.image = kwargs.get('image')
-        self.batch_client = boto3.client('batch')
+        import boto3
+        self.batch_client = boto3.client('batch', region_name=conf[PLATFORM]['regions'])
+        self.ec2_client = boto3.client('ec2', region_name=conf[PLATFORM]['regions'])
+        self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
         super(AWSBatchScheduler, self).__init__()
 
     def update_launch_template(self):
@@ -86,7 +88,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = int(self.disk_size)
             data['LaunchTemplateData']['UserData'] = user_data_base64
 
-        subprocess.call(['aws', 'ec2', 'create-launch-template-version', '--cli-input-json', json.dumps(data)])
+        self.ec2_client.create_launch_template_version(**data)
 
     def create_compute_environment(self):
         with open('AWS/compute_environment.json') as f:
@@ -94,11 +96,11 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
             compute_env_prefix = data.get('computeEnvironmentName', self.compute_env_prefix)
             compute_env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
-            output = subprocess.check_output(
-                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
-            )
-            desc_json = json.loads(output)
+
+            desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
+                logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists',
+                             compute_env_name)
                 return compute_env_name
 
             data['computeEnvironmentName'] = compute_env_name
@@ -106,33 +108,76 @@ class AWSBatchScheduler(BaseBatchSchduler):
             if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
                 del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
 
-        subprocess.call(['aws', 'batch', 'create-compute-environment', '--cli-input-json', json.dumps(data)])
+        logging.info('Attempting to create AWS Batch Compute environment: %s', compute_env_name)
+        self.batch_client.create_compute_environment(**data)
 
-        while True:
-            time.sleep(1)
-            output = subprocess.check_output(
-                ['aws', 'batch', 'describe-compute-environments', '--compute-environments', compute_env_name]
-            )
-            desc_json = json.loads(output)
-            if desc_json['computeEnvironments']:
-                break
+        import botocore.waiter
+        try:
+            logging.info('Waiting for AWS Batch Compute environment %s to provision...', compute_env_name)
+            waiter = self.get_compute_environment_waiter(compute_env_name)
+            waiter.wait(computeEnvironments=[compute_env_name])
+        except botocore.waiter.WaiterError as e:
+            logging.error(e)
+            raise e
+
+        logging.info('Successfully created AWS Batch Compute environment: %s', compute_env_name)
+
         return compute_env_name
+
+    def get_compute_environment_waiter(self, waiter_id):
+        from botocore.waiter import WaiterModel
+        model = WaiterModel({
+            'version': 2,
+            'waiters': {
+                waiter_id: {
+                    'delay': 1,
+                    'operation': 'DescribeComputeEnvironments',
+                    'maxAttempts': 20,
+                    'acceptors': [
+                        {
+                            'expected': 'VALID',
+                            'matcher': 'pathAll',
+                            'state': 'success',
+                            'argument': 'computeEnvironments[].status'
+                        },
+                        {
+                            'expected': 'INVALID',
+                            'matcher': 'pathAny',
+                            'state': 'failure',
+                            'argument': 'computeEnvironments[].status'
+                        }
+                    ]
+                }
+            }
+        })
+        from botocore import waiter
+        return waiter.create_waiter_with_client(waiter_id, model, self.batch_client)
 
     def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'
-        output = subprocess.check_output(['aws', 'batch', 'describe-job-queues', '--job-queues', job_queue_name])
-        desc_json = json.loads(output)
+        desc_json = self.batch_client.describe_job_queues(jobQueues=[job_queue_name])
         env = {"order": 1, "computeEnvironment": env_name}
         data = {"computeEnvironmentOrder": [env]}
-        if desc_json['jobQueues']: # Create if not exist
+        if desc_json['jobQueues']:  # Create if not exist
             data["jobQueue"] = job_queue_name
-            subprocess.call(['aws', 'batch', 'update-job-queue', '--cli-input-json', json.dumps(data)])
+            self.batch_client.update_job_queue(**data)
+            logging.info('Successfully updated AWS Batch Job Queue: %s', job_queue_name)
         else:
-            data["jobQueueName"] = job_queue_name
+            data['jobQueueName'] = job_queue_name
             data['state'] = 'ENABLED'
             data['priority'] = 100
-            subprocess.call(['aws', 'batch', 'create-job-queue', '--cli-input-json', json.dumps(data)])
-        time.sleep(1)
+            self.batch_client.create_job_queue(**data)
+            logging.info('Successfully created AWS Batch Job Queue: %s', job_queue_name)
+
+        from botocore.waiter import WaiterError
+        try:
+            logging.info('Ensuring AWS Batch Job Queue %s is valid...', job_queue_name)
+            job_queue_waiter = self.get_compute_job_queue_waiter(job_queue_name)
+            job_queue_waiter.wait(jobQueues=[job_queue_name])
+            logging.info('AWS Batch Job Queue %s is valid', job_queue_name)
+        except WaiterError as e:
+            logging.error(e)
+            raise e
 
         return job_queue_name
 
@@ -143,8 +188,10 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
             if self.image:
                 data['containerProperties']['image'] = self.image
-        subprocess.call(['aws', 'batch', 'register-job-definition', '--cli-input-json', json.dumps(data)])
-        return data.get('jobDefinitionName', self.job_def_name)
+        self.batch_client.register_job_definition(**data)
+        job_definition_name = data.get('jobDefinitionName', self.job_def_name)
+        logging.info('Successfully registered AWS Batch Job Definition: %s', job_definition_name)
+        return job_definition_name
 
     def submit_job(self, tries=1):
         self.update_launch_template()
@@ -152,38 +199,97 @@ class AWSBatchScheduler(BaseBatchSchduler):
         job_definition_name = self.create_job_def()
 
         jobname = os.path.basename(self.script)
-        s3_path = 's3://' + self.conf[PLATFORM]['bucket'] + '/script/' + jobname + '.sh'
-        subprocess.call(['aws', 's3', 'cp', self.script, s3_path])
+        s3_path = 'script/' + jobname + '.sh'
+        self.s3_bucket.upload_file(self.script, s3_path)
         data = dict()
         data['vcpus'] = self.machine.cpu
         data['memory'] = int(self.machine.mem * 1024 * 0.9)
         data['command'] = [jobname + '.sh']
-        data['environment'] = [{"name": "BATCH_FILE_TYPE", "value": "script"},
-                               {"name": "BATCH_FILE_S3_URL", "value": s3_path}]
-        arguments = ['aws', 'batch', 'submit-job', '--job-name', jobname,
-                     '--job-queue', job_queue_name,
-                     '--job-definition', job_definition_name,
-                     '--container-overrides', json.dumps(data)]
+        data['environment'] = [
+            {"name": "BATCH_FILE_TYPE", "value": "script"},
+            {"name": "BATCH_FILE_S3_URL", "value": "s3://{}/{}".format(self.conf[PLATFORM]['bucket'], s3_path)}
+        ]
+        arguments = {
+            'jobName': jobname,
+            'jobQueue': job_queue_name,
+            'jobDefinition': job_definition_name,
+            'containerOverrides': data
+        }
         if tries > 1:
-            array_properties = {"size": tries}
-            arguments += ['--array-properties', json.dumps(array_properties)]
-        output = subprocess.check_output(arguments)
-        desc_json = json.loads(output)
+            arguments['arrayProperties'] = {"size": tries}
+
+        desc_json = self.batch_client.submit_job(**arguments)
         return desc_json['jobId']
 
-    @staticmethod
-    def wait_jobs(jobs_list):
-        client = boto3.client('batch')
-        while True:
-            finished = True
-            response = client.describe_jobs(jobs=jobs_list)
-            for job in response['jobs']:
-                if job['status'] != 'SUCCEEDED' and job['status'] != 'FAILED':
-                    finished = False
-                    break
-            if finished:
-                break
-            time.sleep(60)
+    def wait_jobs(self, jobs_list):
+        from botocore.waiter import WaiterError
+        waiter_id = '_'.join(jobs_list)
+        logging.info('Waiting for AWS Batch Jobs %s to finish...', jobs_list)
+        try:
+            job_waiter = self.get_compute_job_waiter(waiter_id)
+            job_waiter.wait(jobs=jobs_list)
+        except WaiterError as e:
+            logging.error(e)
+            raise e
+
+        logging.info('AWS Batch Jobs %s have completed', jobs_list)
+
+    def get_compute_job_waiter(self, waiter_id):
+        from botocore.waiter import WaiterModel, create_waiter_with_client
+        model = WaiterModel({
+            'version': 2,
+            'waiters': {
+                waiter_id: {
+                    'delay': 60,
+                    'operation': 'DescribeJobs',
+                    'maxAttempts': 24 * 60,
+                    'acceptors': [
+                        {
+                            'expected': 'SUCCEEDED',
+                            'matcher': 'pathAll',
+                            'state': 'success',
+                            'argument': 'jobs[].status'
+                        },
+                        {
+                            'expected': 'FAILED',
+                            'matcher': 'pathAny',
+                            'state': 'failure',
+                            'argument': 'jobs[].status'
+                        }
+                    ]
+                }
+            }
+        })
+        return create_waiter_with_client(waiter_id, model, self.batch_client)
+
+    def get_compute_job_queue_waiter(self, waiter_id):
+        from botocore.waiter import WaiterModel
+        model = WaiterModel({
+            'version': 2,
+            'waiters': {
+                waiter_id: {
+                    'delay': 10,
+                    'operation': 'DescribeJobQueues',
+                    'maxAttempts': 20,
+                    'acceptors': [
+                        {
+                            'expected': 'VALID',
+                            'matcher': 'pathAll',
+                            'state': 'success',
+                            'argument': 'jobQueues[].status'
+                        },
+                        {
+                            'expected': 'INVALID',
+                            'matcher': 'pathAny',
+                            'state': 'failure',
+                            'argument': 'jobQueues[].status'
+                        }
+                    ]
+                }
+            }
+        })
+        from botocore import waiter
+        return waiter.create_waiter_with_client(waiter_id, model, self.batch_client)
 
 
 class AzureBatchScheduler(BaseBatchSchduler):
@@ -276,8 +382,6 @@ class AzureBatchScheduler(BaseBatchSchduler):
             self, publisher='microsoft-azure-batch', offer='ubuntu-server-container', sku_starts_with='16-04'):
         """Select the latest verified image that Azure Batch supports given
         a publisher, offer and sku (starts with filter).
-        :param batch_client: The batch client to use.
-        :type batch_client: `batchserviceclient.BatchServiceClient`
         :param str publisher: vm image publisher
         :param str offer: vm image offer
         :param str sku_starts_with: vm sku starts with filter
@@ -286,17 +390,16 @@ class AzureBatchScheduler(BaseBatchSchduler):
         """
         # get verified vm image list and node agent sku ids from service
         from azure.batch import models as batchmodels
-
         options = batchmodels.AccountListSupportedImagesOptions(filter="verificationType eq 'verified'")
         images = self.batch_client.account.list_supported_images(account_list_supported_images_options=options)
 
         # pick the latest supported sku
-        skus_to_use = [
-            (image.node_agent_sku_id, image.image_reference) for image in images
-            if image.image_reference.publisher.lower() == publisher.lower() and
-               image.image_reference.offer.lower() == offer.lower() and
-               image.image_reference.sku.startswith(sku_starts_with)
-        ]
+        skus_to_use = []
+        for image in images:
+            if image.image_reference.publisher.lower() == publisher.lower() \
+                    and image.image_reference.offer.lower() == offer.lower() \
+                    and image.image_reference.sku.startswith(sku_starts_with):
+                skus_to_use.append((image.node_agent_sku_id, image.image_reference))
 
         # pick first
         agent_sku_id, image_ref_to_use = skus_to_use[0]
@@ -352,7 +455,8 @@ class AzureBatchScheduler(BaseBatchSchduler):
             batchmodels.EnvironmentSetting(name='AZURE_SUBSCRIPTION_ID', value=platform['subscription']),
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_ACCOUNT', value=platform['storage_account']),
             batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONTAINER', value=platform['storage_container']),
-            batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONNECTION_STRING', value=platform['storage_connection_string']),
+            batchmodels.EnvironmentSetting(name='AZURE_STORAGE_CONNECTION_STRING',
+                                           value=platform['storage_connection_string']),
             batchmodels.EnvironmentSetting(name='BLOB_NAME', value=self.script_target_name),
         ]
 
