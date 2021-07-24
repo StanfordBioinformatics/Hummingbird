@@ -32,7 +32,7 @@ setup(
             'matplotlib==3.3.0',
             'scikit-learn==0.23.2',
             'google-cloud-storage==1.30.0',
-            'boto3==1.14.38',
+            'boto3==1.18.6',
             'azure-storage-blob==12.6.0',
             'azure-identity==1.5.0',
             'azure-batch==10.0.0',

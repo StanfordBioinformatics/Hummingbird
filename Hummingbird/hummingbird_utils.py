@@ -24,6 +24,7 @@ PLATFORM = 'Platform'
 DOWNSAMPLE = 'Downsample'
 PROFILING = 'Profiling'
 
+
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -33,6 +34,7 @@ class bcolors:
     ENDC = '\033[0m'
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
+
 
 def humanize(num):
     """A utility function to help generate human readable number string"""
@@ -47,13 +49,15 @@ def humanize(num):
             num /= 1000
     return "%d%s" % (num, 'G')
 
+
 def cost_efficiency(run_times, costs):
     """Compute the cost efficiency as the metrics of instance."""
     speedups = np.reciprocal(run_times)
     return speedups / costs
 
+
 def speedup_efficiency(zipped_runtimes):
-    zipped_runtimes.sort(key=lambda t:(t[1].cpu, t[0]))
+    zipped_runtimes.sort(key=lambda t: (t[1].cpu, t[0]))
     print(zipped_runtimes)
     base_time = zipped_runtimes[0][0]
     base_core = zipped_runtimes[0][1].cpu
@@ -63,6 +67,7 @@ def speedup_efficiency(zipped_runtimes):
         efficiency = speedup / ideal
         print(speedup, ideal, efficiency)
 
+
 def spline(method, known_data, target_value):
     """Use scipy interpolate module to extrapolate target value and plot."""
     x = known_data.keys()
@@ -71,7 +76,7 @@ def spline(method, known_data, target_value):
     x_test = np.linspace(1000, target_value, num=100)
     plt.figure(figsize=(18, 10))
     for i in range(len(ys[0])):
-        y = ys[:,i]
+        y = ys[:, i]
         if method == 'spline':
             f = UnivariateSpline(x, y, k=1, ext='extrapolate')
         elif method == 'rbf':
@@ -83,6 +88,7 @@ def spline(method, known_data, target_value):
     plt.show()
     return result
 
+
 def regression(known_data, target_value, filename='plot/hummingbird.png'):
     """Use sklearn regression module to predict target value and plot."""
     X = np.array(known_data.keys())
@@ -93,7 +99,7 @@ def regression(known_data, target_value, filename='plot/hummingbird.png'):
     x_test = x_test.reshape(100, 1)
     plt.figure(figsize=(18, 10))
     for i in range(len(ys[0])):
-        y = ys[:,i]
+        y = ys[:, i]
         regr = linear_model.LinearRegression()
         regr.fit(X, y)
         # Reshape data using array.reshape(-1, 1) if your data has a single feature

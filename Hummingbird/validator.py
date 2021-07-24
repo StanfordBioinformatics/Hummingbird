@@ -1,4 +1,6 @@
-from Hummingbird.instance import Instance
+#!/usr/bin/env python3
+
+from .instance import Instance
 
 MISSING_FIELD_ERR_FMT = "{0} is a required field in the conf file."
 
@@ -36,7 +38,8 @@ def __verify_present(val, key, type_check=None):
 
     result = val[key]
     if type_check and not isinstance(result, type_check):
-        raise ConfigurationError(message="{0} field in the conf needs to be of type '{1}'.".format(key, type_check.__name__))
+        raise ConfigurationError(
+            message="{0} field in the conf needs to be of type '{1}'.".format(key, type_check.__name__))
     return result
 
 

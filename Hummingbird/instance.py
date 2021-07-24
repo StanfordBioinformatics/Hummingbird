@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-import subprocess
 import sqlite3
+import subprocess
 
 from retry import retry
 
@@ -97,7 +97,7 @@ class GCPInstance(Instance):
         cur = conn.cursor()
         cur.execute('''CREATE TABLE instance
                     (NAME text, ZONE text, CPUS INTEGER, MEMORY_GB real, DEPRECATED text)''')
-        machine_types = output.decode("utf-8").splitlines() # decode to convert bytes array to string in python3
+        machine_types = output.decode("utf-8").splitlines()  # decode to convert bytes array to string in python3
         machine_types = [line.split() for line in machine_types]
         # Deprecated filed is empty for returned output
         machine_types = [line + [None] for line in machine_types if len(line) == 4]
@@ -157,7 +157,8 @@ AND CPUS = ? '''
 
 
 class AWSInstance(Instance):
-    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge', 36: '.9xlarge', 64: '.16xlarge'}
+    thread_suffix = {1: '.micro', 2: '.large', 4: '.xlarge', 8: '.2xlarge', 16: '.4xlarge', 32: '.8xlarge',
+                     36: '.9xlarge', 64: '.16xlarge'}
     # TODO dynamically fetch instance pricing. e.g.:
     #   aws pricing get-products --service-code AmazonEC2 \
     #       --filters "Type=TERM_MATCH,Field=instanceType,Value=m5.xlarge" \

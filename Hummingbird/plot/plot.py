@@ -1,7 +1,11 @@
+#!/usr/bin/env python3
+
 import sys
+
+import matplotlib
 import numpy as np
 from sklearn import linear_model
-import matplotlib
+
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
@@ -24,6 +28,7 @@ colors = {
     'Idr': '#bcbd22'
 }
 
+
 def extrapolate(known_data, actual_data, target, task):
     x = np.array(list(known_data.keys()), dtype=np.float64)
     ys = np.array(list(known_data.values())).transpose()
@@ -43,7 +48,7 @@ def extrapolate(known_data, actual_data, target, task):
         target = np.array(100).reshape(-1, 1)
         target = np.log10(target)
         pred = max(np.max(y), np.asscalar(regr.predict(target)))
-        #plt.subplot(len(ys), 1, i + 1)
+        # plt.subplot(len(ys), 1, i + 1)
         if len(ys) == 3:
             if i == 0:
                 linestyle = ':'
@@ -71,20 +76,25 @@ def extrapolate(known_data, actual_data, target, task):
         datapoint_plot, = plt.plot(x, y, marker, color=colors[task], markersize=10)
         legend_handles.append((regression_line, datapoint_plot))
         legend_lables.append(lable)
-        #plt.plot(target, actual_data[i]], 'ro')
+        # plt.plot(target, actual_data[i]], 'ro')
         yerr = [[0], [pred - actual_data[i]]]
-        plt.errorbar(target, actual_data[i], fmt=marker, markersize=10, color=colors[task], yerr=yerr, capsize=4, ecolor='black')
+        plt.errorbar(target, actual_data[i], fmt=marker, markersize=10, color=colors[task], yerr=yerr, capsize=4,
+                     ecolor='black')
         print(plt.axis())
         xmin, xmax, ymin, ymax = plt.axis()
-        offset = (ymax-ymin)*0.02*i
-        plt.annotate("%.2f%%" % (100*(pred-actual_data[i])/actual_data[i]), xy=(target+0.1, (actual_data[i]+pred)/2+offset))
+        offset = (ymax - ymin) * 0.02 * i
+        plt.annotate("%.2f%%" % (100 * (pred - actual_data[i]) / actual_data[i]),
+                     xy=(target + 0.1, (actual_data[i] + pred) / 2 + offset))
     ax = plt.gca()
     ax.yaxis.set_major_formatter(matplotlib.ticker.StrMethodFormatter('{x:.1f}'))
+
+
 plt.rcParams['axes.spines.right'] = False
 plt.rcParams['axes.spines.top'] = False
 plt.rcParams.update({'font.size': 22})
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Arial']
+
 
 def plot_haplotypecaller():
     plt.figure(figsize=(16, 9))
@@ -113,7 +123,9 @@ def plot_haplotypecaller():
     # truth = [2358020, 2455488]
     # extrapolate(data, truth, 707646124, 'ApplyBQSR')
 
-    data = {1417289: [12013737.333333332, 6333733.333333334, 6597452.0], 14172891: [12020142.666666666, 12626956.0, 12860710.666666668], 141728916: [12651493.333333332, 13344673.333333336, 13693002.666666668]}
+    data = {1417289: [12013737.333333332, 6333733.333333334, 6597452.0],
+            14172891: [12020142.666666666, 12626956.0, 12860710.666666668],
+            141728916: [12651493.333333332, 13344673.333333336, 13693002.666666668]}
     truth = [9262152, 13120061.3333333, 13665805.3333333]
     extrapolate(data, truth, 1417289160, 'HaplotypeCaller')
 
@@ -124,10 +136,13 @@ def plot_haplotypecaller():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('haplotypecaller.pdf')
 
+
 def plot_mutect():
     plt.figure(figsize=(16, 9))
 
-    data = {811944: [5063106.666666667, 6336018.666666666, 11067504.0], 8119448: [5400526.666666666, 7497428.0, 10915470.666666666], 81194: [5161272.0, 6537250.666666667, 11535181.333333334]}
+    data = {811944: [5063106.666666667, 6336018.666666666, 11067504.0],
+            8119448: [5400526.666666666, 7497428.0, 10915470.666666666],
+            81194: [5161272.0, 6537250.666666667, 11535181.333333334]}
     truth = [6555428, 11945592, 14540496]
     extrapolate(data, truth, 81194486, 'Mutect2')
 
@@ -138,10 +153,12 @@ def plot_mutect():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('mutect2.pdf')
 
+
 def plot_trim():
     plt.figure(figsize=(16, 9))
 
-    data = {308272: [13356.0, 13304.0, 13340.0], 30827265: [13344.0, 13304.0, 13320.0], 3082726: [13284.0, 13344.0, 13292.0]}
+    data = {308272: [13356.0, 13304.0, 13340.0], 30827265: [13344.0, 13304.0, 13320.0],
+            3082726: [13284.0, 13344.0, 13292.0]}
     truth = [13320, 13316, 13340]
     extrapolate(data, truth, 308272658, 'Trim_adapter')
 
@@ -152,11 +169,13 @@ def plot_trim():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('trim.pdf')
 
+
 def plot_filter():
     plt.figure(figsize=(16, 9))
 
-    data = {308272: [2068312.0, 2169028.0, 2339160.0], 30827265: [3667928.0, 4155688.0, 3868056.0], 3082726: [2981972.0, 3029340.0, 3026776.0]}
-    truth = [4375888,4421372,4886696]
+    data = {308272: [2068312.0, 2169028.0, 2339160.0], 30827265: [3667928.0, 4155688.0, 3868056.0],
+            3082726: [2981972.0, 3029340.0, 3026776.0]}
+    truth = [4375888, 4421372, 4886696]
     extrapolate(data, truth, 308272658, 'Filter')
 
     plt.legend(legend_handles, legend_lables)
@@ -166,11 +185,13 @@ def plot_filter():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('filter.pdf')
 
+
 def plot_atac1():
     plt.figure(figsize=(16, 9))
 
-    data = {308272: [196456.0, 198480.0, 207344.0], 30827265: [2128712.0, 2132856.0, 2139284.0], 3082726: [1115436.0, 1115656.0, 1118124.0]}
-    truth = [2383024,2386120,2394704]
+    data = {308272: [196456.0, 198480.0, 207344.0], 30827265: [2128712.0, 2132856.0, 2139284.0],
+            3082726: [1115436.0, 1115656.0, 1118124.0]}
+    truth = [2383024, 2386120, 2394704]
     extrapolate(data, truth, 308272658, 'Bam2ta')
 
     plt.legend(legend_handles, legend_lables)
@@ -180,15 +201,17 @@ def plot_atac1():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('atac1.pdf')
 
+
 def plot_atac2():
     plt.figure(figsize=(16, 9))
 
-    data = {308272: [45408.0, 44964.0, 44956.0], 30827265: [3050292.0, 3050272.0, 3050292.0], 3082726: [314820.0, 314868.0, 314760.0]}
-    truth = [4298268,4298364,4298256]
+    data = {308272: [45408.0, 44964.0, 44956.0], 30827265: [3050292.0, 3050272.0, 3050292.0],
+            3082726: [314820.0, 314868.0, 314760.0]}
+    truth = [4298268, 4298364, 4298256]
     extrapolate(data, truth, 308272658, 'Xcor')
 
     data = {308272: [141496.0, 141496.0], 30827265: [9636716.0, 12046012.0], 3082726: [1111720.0, 1389480.0]}
-    truth = [11698440,11706940]
+    truth = [11698440, 11706940]
     extrapolate(data, truth, 308272658, 'Macs2')
 
     plt.legend(legend_handles, legend_lables)
@@ -198,11 +221,12 @@ def plot_atac2():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('atac2.pdf')
 
+
 def plot_spr():
     plt.figure(figsize=(16, 9))
 
     data = {308272: [16204.0, 16196.0], 30827265: [1419480.0, 1419468.0], 3082726: [147184.0, 147296.0]}
-    truth = [11752640,11752540]
+    truth = [11752640, 11752540]
     extrapolate(data, truth, 308272658, 'Spr')
 
     plt.legend(legend_handles, legend_lables)
@@ -212,15 +236,16 @@ def plot_spr():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('spr.pdf')
 
+
 def plot_atac3():
     plt.figure(figsize=(16, 9))
 
     data = {308272: [81656.0, 81668.0], 30827265: [182228.0, 182276.0], 3082726: [225696.0, 225780.0]}
-    truth = [222320,222312]
+    truth = [222320, 222312]
     extrapolate(data, truth, 308272658, 'Overlap')
 
     data = {308272: [231160.0, 231004.0], 30827265: [671076.0, 671388.0], 3082726: [513376.0, 512628.0]}
-    truth = [887312,887536]
+    truth = [887312, 887536]
     extrapolate(data, truth, 308272658, 'Idr')
 
     plt.legend(legend_handles, legend_lables)
@@ -230,11 +255,13 @@ def plot_atac3():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('atac3.pdf')
 
+
 def plot_bowtie():
     plt.figure(figsize=(16, 9))
 
-    data = {308272: [3584592.0, 3792768.0, 4197804.0], 30827265: [3644068.0, 3913304.0, 4427708.0], 3082726: [3611956.0, 3846216.0, 4300156.0]}
-    truth = [3676768,3971904,4544272]
+    data = {308272: [3584592.0, 3792768.0, 4197804.0], 30827265: [3644068.0, 3913304.0, 4427708.0],
+            3082726: [3611956.0, 3846216.0, 4300156.0]}
+    truth = [3676768, 3971904, 4544272]
     extrapolate(data, truth, 308272658, 'Bowtie2')
 
     plt.legend(legend_handles, legend_lables)
@@ -244,10 +271,12 @@ def plot_bowtie():
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('bowtie.pdf')
 
+
 def plot_bwa():
     plt.figure(figsize=(16, 9))
 
-    data = {70764612: [10537584.0, 15552648.0, 25266520.0], 7076461: [9060508.0, 10148120.0, 11261328.0], 707646: [6508520.0, 7113960.0, 7186892.0]}
+    data = {70764612: [10537584.0, 15552648.0, 25266520.0], 7076461: [9060508.0, 10148120.0, 11261328.0],
+            707646: [6508520.0, 7113960.0, 7186892.0]}
     truth = [11936674.67, 17565605.33, 26138992]
     extrapolate(data, truth, 707646124, 'BWA-MEM')
 
@@ -257,6 +286,7 @@ def plot_bwa():
     plt.xlabel('Downsample Percentage')
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('bwa.pdf')
+
 
 def plot_preprocess():
     plt.figure(figsize=(16, 9))
@@ -269,11 +299,13 @@ def plot_preprocess():
     truth = [8755872, 8810644]
     extrapolate(data, truth, 707646124, 'MarkDuplicate')
 
-    data = {70764612: [19626.666666666668, 19570.666666666668], 7076461: [17226.666666666664, 17242.666666666664], 707646: [15429.333333333332, 15513.333333333336]}
+    data = {70764612: [19626.666666666668, 19570.666666666668], 7076461: [17226.666666666664, 17242.666666666664],
+            707646: [15429.333333333332, 15513.333333333336]}
     truth = [23624, 23776]
     extrapolate(data, truth, 707646124, 'BaseRecalibrator')
 
-    data = {70764612: [2371590.6666666665, 2686521.3333333335], 7076461: [2653056.0, 2700041.333333333], 707646: [2284984.0, 2364088.0]}
+    data = {70764612: [2371590.6666666665, 2686521.3333333335], 7076461: [2653056.0, 2700041.333333333],
+            707646: [2284984.0, 2364088.0]}
     truth = [2358020, 2455488]
     extrapolate(data, truth, 707646124, 'ApplyBQSR')
 
@@ -283,6 +315,7 @@ def plot_preprocess():
     plt.xlabel('Downsample Percentage')
     plt.ylabel('Memory Usage (GB)')
     plt.savefig('preprocess.pdf')
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
