@@ -1,9 +1,13 @@
-FROM broadinstitute/gatk:4.1.4.0
+FROM broadinstitute/gatk3:3.8-0
 
-LABEL gatk.version="4.1.4.0"
+LABEL gatk.version="3.8-0"
 
 ENV DEBIAN_FRONTEND noninteractive
 
+RUN echo "deb [check-valid-until=no] http://cdn-fastly.deb.debian.org/debian jessie main" > /etc/apt/sources.list.d/jessie.list
+RUN echo "deb [check-valid-until=no] http://archive.debian.org/debian jessie-backports main" > /etc/apt/sources.list.d/jessie-backports.list
+RUN sed -i '/deb http:\/\/deb.debian.org\/debian jessie-updates main/d' /etc/apt/sources.list
+RUN echo "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/100disablechecks
 RUN apt-get update && apt-get install -y \
     git \
     curl \
