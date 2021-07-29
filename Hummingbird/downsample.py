@@ -198,11 +198,9 @@ class Downsample(object):
             return {self.conf[DOWNSAMPLE]['target']: key_file_dict}
 
         if type == SAM or type == BAM:
-            tool = Downsample.default_sam_tool
             sys.exit('SAM/BAM Downsample is unsupported in AWS')
-        else:
-            tool = Downsample.default_fa_tool
 
+        tool = Downsample.default_fa_tool
         bucket_dir = 's3://' + self.conf[PLATFORM]['bucket']
         output_path = self.conf[DOWNSAMPLE]['output'].strip('/')
         downsampled = defaultdict(dict)
@@ -234,7 +232,8 @@ class Downsample(object):
         ds_script.seek(0)
         machine = AWSInstance(next(type for type in AWSInstance.pricing if type.endswith(AWSInstance.thread_suffix[4])))
         image = self.conf[DOWNSAMPLE].get('image')
-        scheduler = AWSBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
+        disk = self.conf[DOWNSAMPLE].get('disk', Downsample.default_disk_size)
+        scheduler = AWSBatchScheduler(self.conf, machine, disk, ds_script.name, image=image)
         jobname = scheduler.submit_job()
         scheduler.wait_jobs([jobname])
         return downsampled
@@ -290,7 +289,8 @@ class Downsample(object):
         ds_script.seek(0)
         machine = AzureInstance(self.conf, name=AzureInstance.machine_thread_mapping[8][-1])
         image = self.conf[DOWNSAMPLE].get('image')
-        scheduler = AzureBatchScheduler(self.conf, machine, 200, ds_script.name, image=image)
+        disk = self.conf[DOWNSAMPLE].get('disk', 200)
+        scheduler = AzureBatchScheduler(self.conf, machine, disk, ds_script.name, image=image)
         job_info = scheduler.submit_job()
         scheduler.wait_for_tasks_to_complete([job_info['job_id']])
         return downsampled
