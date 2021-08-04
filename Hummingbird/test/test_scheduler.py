@@ -54,5 +54,5 @@ class TestAWSScheduler(unittest.TestCase):
         compute_env_waiter = self.instance.get_compute_job_waiter(waiter_id)
 
         self.assertEqual(waiter_id, compute_env_waiter.name)
-        self.assertEqual(24 * 60, compute_env_waiter.config.max_attempts)
+        self.assertEqual(24 * 60 * 2, compute_env_waiter.config.max_attempts)
         self.assertEqual(60, compute_env_waiter.config.delay)
