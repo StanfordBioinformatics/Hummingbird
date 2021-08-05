@@ -1,28 +1,28 @@
 {
-  "computeEnvironmentName": "hummingbird-env",
-  "type": "MANAGED",
-  "state": "ENABLED",
-  "computeResources": {
-    "type": "EC2",
-    "allocationStrategy": "BEST_FIT",
-    "minvCpus": 0,
-    "maxvCpus": 256,
-    "desiredvCpus": 0,
-    "instanceTypes": [
-    ],
-    "subnets": [
-    ],
-    "securityGroupIds": [
-    ],
-    "ec2KeyPair": "",
-    "instanceRole": "ecsInstanceRole",
-    "tags": {
-      "KeyName": "hummingbird"
+    "computeEnvironmentName": "hummingbird-env",
+    "type": "MANAGED",
+    "state": "ENABLED",
+    "computeResources": {
+        "type": "EC2",
+        "allocationStrategy": "BEST_FIT",
+        "minvCpus": 0,
+        "maxvCpus": 256,
+        "desiredvCpus": 0,
+        "instanceTypes": [
+        ],
+        "subnets": [
+        ],
+        "securityGroupIds": [
+        ],
+        "ec2KeyPair": "",
+        "instanceRole": "ecsInstanceRole",
+        "tags": {
+            "KeyName": "hummingbird"
+        },
+        "launchTemplate": {
+            "launchTemplateName": "hummingbird_disk_launch_template",
+            "version": "$Latest"
+        }
     },
-    "launchTemplate": {
-      "launchTemplateName": "hummingbird_disk_launch_template",
-      "version": "$Latest"
-    }
-  },
-  "serviceRole": "<AWSServiceRoleForBatch>"
+    "serviceRole": "<AWSServiceRoleForBatch>"
 }

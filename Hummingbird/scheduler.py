@@ -7,12 +7,21 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timedelta
+from string import Template
 from typing import List
 
 from retry import retry
 
-from .errors import SchedulerException
 from .hummingbird_utils import PLATFORM
+
+try:
+    from email import encoders
+    from email.MIMEMultipart import MIMEMultipart
+    from email.MIMEText import MIMEText
+except ImportError:
+    from email import encoders
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
 
 
 class Scheduler(object):
@@ -45,6 +54,10 @@ class Scheduler(object):
 class BaseBatchSchduler(object):
     job_def_name = 'hummingbird-job'
     compute_env_prefix = 'hummingbird-env-'
+    startup_script_template = '''#cloud-boothook
+#!/bin/bash
+cloud-init-per once docker_options echo 'OPTIONS="$${OPTIONS} --storage-opt dm.basesize=$basesize"' >> /etc/sysconfig/docker
+'''
 
 
 class AWSBatchScheduler(BaseBatchSchduler):
@@ -54,32 +67,30 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.disk_size = disk_size
         self.script = script
         self.image = kwargs.get('image')
-        self.region = conf[PLATFORM]['regions']
         import boto3
-        self.batch_client = boto3.client('batch', region_name=self.region)
-        self.ec2_client = boto3.client('ec2', region_name=self.region)
+        self.batch_client = boto3.client('batch', region_name=conf[PLATFORM]['regions'])
+        self.ec2_client = boto3.client('ec2', region_name=conf[PLATFORM]['regions'])
         self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
         super(AWSBatchScheduler, self).__init__()
 
-    def create_or_update_launch_template(self):
+    def update_launch_template(self):
+        basesize = str(self.disk_size) + 'G'
+        startup_script = Template(self.startup_script_template).substitute(basesize=basesize)
+        payload = MIMEText(startup_script, 'cloud-boothook')
+        mime = MIMEMultipart()
+        mime.attach(payload)
+        user_data = MIMEText(mime.as_string(), 'plain')
+        encoders.encode_base64(user_data)
+        user_data_base64 = user_data.get_payload()
+
         with open('AWS/launch-template-data.json') as f:
             data = json.load(f)
             data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = int(self.disk_size)
+            data['LaunchTemplateData']['UserData'] = user_data_base64
 
-        from botocore.exceptions import ClientError
-        try:
-            response = self.ec2_client.describe_launch_templates(LaunchTemplateNames=[data['LaunchTemplateName']])
-        except ClientError:
-            response = {}
+        self.ec2_client.create_launch_template_version(**data)
 
-        if not response.get('LaunchTemplates'):
-            logging.info('Creating launch template %s as it does not exist', data['LaunchTemplateName'])
-            self.ec2_client.create_launch_template(**data)
-        else:
-            logging.info('Creating a new version for launch template %s', data['LaunchTemplateName'])
-            self.ec2_client.create_launch_template_version(**data)
-
-    def create_or_update_compute_environment(self):
+    def create_compute_environment(self):
         with open('AWS/compute_environment.json') as f:
             data = json.load(f)
 
@@ -88,7 +99,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
             desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
-                logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists', compute_env_name)
+                logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists',
+                             compute_env_name)
                 return compute_env_name
 
             data['computeEnvironmentName'] = compute_env_name
@@ -96,7 +108,6 @@ class AWSBatchScheduler(BaseBatchSchduler):
             if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
                 del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
 
-        data['tags'] = {'Name': compute_env_name}
         logging.info('Attempting to create AWS Batch Compute environment: %s', compute_env_name)
         self.batch_client.create_compute_environment(**data)
 
@@ -106,11 +117,11 @@ class AWSBatchScheduler(BaseBatchSchduler):
             waiter = self.get_compute_environment_waiter(compute_env_name)
             waiter.wait(computeEnvironments=[compute_env_name])
         except botocore.waiter.WaiterError as e:
-            msg = f"There was an error with the AWS Batch Compute Environment: {compute_env_name}"
-            logging.exception(msg)
-            raise SchedulerException(msg)
+            logging.error(e)
+            raise e
 
         logging.info('Successfully created AWS Batch Compute environment: %s', compute_env_name)
+
         return compute_env_name
 
     def get_compute_environment_waiter(self, waiter_id):
@@ -142,22 +153,21 @@ class AWSBatchScheduler(BaseBatchSchduler):
         from botocore import waiter
         return waiter.create_waiter_with_client(waiter_id, model, self.batch_client)
 
-    def create_or_update_job_queue(self, env_name):
+    def update_job_queue(self, env_name):
         job_queue_name = env_name + '-queue'
         desc_json = self.batch_client.describe_job_queues(jobQueues=[job_queue_name])
         env = {"order": 1, "computeEnvironment": env_name}
-        data = {'computeEnvironmentOrder': [env]}
+        data = {"computeEnvironmentOrder": [env]}
         if desc_json['jobQueues']:  # Create if not exist
             data["jobQueue"] = job_queue_name
-            logging.info('Attempting to update AWS Batch Job Queue: %s', job_queue_name)
             self.batch_client.update_job_queue(**data)
+            logging.info('Successfully updated AWS Batch Job Queue: %s', job_queue_name)
         else:
             data['jobQueueName'] = job_queue_name
             data['state'] = 'ENABLED'
             data['priority'] = 100
-            data['tags'] = {'Name': job_queue_name, 'ComputeEnvironment': env_name}
-            logging.info('Attempting to create AWS Batch Job Queue: %s', job_queue_name)
             self.batch_client.create_job_queue(**data)
+            logging.info('Successfully created AWS Batch Job Queue: %s', job_queue_name)
 
         from botocore.waiter import WaiterError
         try:
@@ -166,31 +176,27 @@ class AWSBatchScheduler(BaseBatchSchduler):
             job_queue_waiter.wait(jobQueues=[job_queue_name])
             logging.info('AWS Batch Job Queue %s is valid', job_queue_name)
         except WaiterError as e:
-            msg = f"There was an error with the AWS Batch Job Queue: {job_queue_name}"
-            logging.exception(msg)
-            raise SchedulerException(msg)
+            logging.error(e)
+            raise e
 
         return job_queue_name
 
-    def register_job_definition(self, compute_env_name, job_queue_name):
+    def create_job_def(self):
         with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
             if self.image:
                 data['containerProperties']['image'] = self.image
-        job_definition_name = data.get('jobDefinitionName', self.job_def_name)
-        data.setdefault('tags', {})
-        data['tags'].update({'Name': job_definition_name, 'ComputeEnvironment': compute_env_name, 'JobQueue': job_queue_name})
         self.batch_client.register_job_definition(**data)
+        job_definition_name = data.get('jobDefinitionName', self.job_def_name)
         logging.info('Successfully registered AWS Batch Job Definition: %s', job_definition_name)
         return job_definition_name
 
     def submit_job(self, tries=1):
-        self.create_or_update_launch_template()
-        compute_env_name = self.create_or_update_compute_environment()
-        job_queue_name = self.create_or_update_job_queue(compute_env_name)
-        job_definition_name = self.register_job_definition(compute_env_name, job_queue_name)
+        self.update_launch_template()
+        job_queue_name = self.update_job_queue(self.create_compute_environment())
+        job_definition_name = self.create_job_def()
 
         jobname = os.path.basename(self.script)
         s3_path = 'script/' + jobname + '.sh'
@@ -207,25 +213,13 @@ class AWSBatchScheduler(BaseBatchSchduler):
             'jobName': jobname,
             'jobQueue': job_queue_name,
             'jobDefinition': job_definition_name,
-            'containerOverrides': data,
-            'tags': {
-                'Name': jobname,
-                'ComputeEnvironment': compute_env_name,
-                'JobQueue': job_queue_name,
-                'JobDefinitionName': job_definition_name
-            },
-            'propagateTags': True
+            'containerOverrides': data
         }
         if tries > 1:
-            arguments['arrayProperties'] = {'size': tries}
+            arguments['arrayProperties'] = {"size": tries}
 
         desc_json = self.batch_client.submit_job(**arguments)
-        job_id = desc_json['jobId']
-
-        logging.info('You can observe the job status via AWS Console: '
-                     'https://console.aws.amazon.com/batch/home?region=%s#jobs/%s/%s',
-                     self.region, 'array-job' if tries > 1 else 'detail', job_id)
-        return job_id
+        return desc_json['jobId']
 
     def wait_jobs(self, jobs_list):
         from botocore.waiter import WaiterError
@@ -235,9 +229,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
             job_waiter = self.get_compute_job_waiter(waiter_id)
             job_waiter.wait(jobs=jobs_list)
         except WaiterError as e:
-            msg = f"There was an error with AWS Batch Jobs {jobs_list}"
-            logging.exception(msg)
-            raise SchedulerException(msg)
+            logging.error(e)
+            raise e
 
         logging.info('AWS Batch Jobs %s have completed', jobs_list)
 
@@ -427,7 +420,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
             self.batch_client.job.add(job)
         except batchmodels.BatchErrorException as err:
             if err.error.code != "JobExists":
-                raise SchedulerException(f"Unable to create job {job_queue_name}")
+                raise
             else:
                 logging.info("Job {!r} already exists".format(job_queue_name))
 
@@ -537,7 +530,8 @@ class AzureBatchScheduler(BaseBatchSchduler):
                 time.sleep(5)
 
         print()
-        raise SchedulerException("ERROR: Tasks did not reach 'Completed' state within timeout period of " + str(timeout))
+        raise RuntimeError("ERROR: Tasks did not reach 'Completed' state within "
+                           "timeout period of " + str(timeout))
 
     @retry(tries=3, delay=1)
     def upload_script(self):

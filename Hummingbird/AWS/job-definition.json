@@ -1,28 +1,28 @@
 {
-  "jobDefinitionName": "hummingbird-job",
-  "type": "container",
-  "containerProperties": {
-    "image": "cloudhummingbird/bwa:1.0",
-    "vcpus": 0,
-    "memory": 0,
-    "command": [
-      "/bin/bash",
-      "-c",
-      "/usr/local/bin/aws_fetch_and_run.sh"
-    ],
-    "jobRoleArn": "<ecsTaskExecutionRole>",
-    "volumes": [
-    ],
-    "environment": [
-    ],
-    "mountPoints": [
-    ],
-    "ulimits": [
-    ],
-    "resourceRequirements": [
-    ]
-  },
-  "retryStrategy": {
-    "attempts": 1
-  }
+    "jobDefinitionName": "hummingbird-job",
+    "type": "container",
+    "containerProperties": {
+        "image": "cloudhummingbird/bwa:1.0",
+        "vcpus": 0,
+        "memory": 0,
+        "command": [
+            "/bin/bash",
+            "-c",
+            "/usr/local/bin/aws_fetch_and_run.sh"
+        ],
+        "jobRoleArn": "<ecsTaskExecutionRole>",
+        "volumes": [
+        ],
+        "environment": [
+        ],
+        "mountPoints": [
+        ],
+        "ulimits": [
+        ],
+        "resourceRequirements": [
+        ]
+    },
+    "retryStrategy": {
+        "attempts": 1
+    }
 }
