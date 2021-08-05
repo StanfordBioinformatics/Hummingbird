@@ -249,7 +249,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
                 waiter_id: {
                     'delay': 60,
                     'operation': 'DescribeJobs',
-                    'maxAttempts': 24 * 60,
+                    'maxAttempts': 24 * 60 * 2,  # timeout of 2 days
                     'acceptors': [
                         {
                             'expected': 'SUCCEEDED',
