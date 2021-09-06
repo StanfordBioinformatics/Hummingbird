@@ -59,6 +59,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.batch_client = boto3.client('batch', region_name=self.region)
         self.ec2_client = boto3.client('ec2', region_name=self.region)
         self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
+        self.cf_client = boto3.resource('cloudformation')
+        self.cf_stack_name = conf[PLATFORM]['cloudformation_stack_name']
         super(AWSBatchScheduler, self).__init__()
 
     def create_or_update_launch_template(self):
@@ -79,22 +81,26 @@ class AWSBatchScheduler(BaseBatchSchduler):
             logging.info('Creating a new version for launch template %s', data['LaunchTemplateName'])
             self.ec2_client.create_launch_template_version(**data)
 
-    def create_or_update_compute_environment(self):
+    def create_or_update_compute_environment(self, cf_output):
         with open('AWS/compute_environment.json') as f:
             data = json.load(f)
 
-            compute_env_prefix = data.get('computeEnvironmentName', self.compute_env_prefix)
-            compute_env_name = compute_env_prefix + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
-
+            compute_env_name = self.cf_stack_name + '-' + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
             desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
                 logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists', compute_env_name)
                 return compute_env_name
 
+            compute_resources = data['computeResources']
             data['computeEnvironmentName'] = compute_env_name
-            data['computeResources']['instanceTypes'].append(self.machine.name)
-            if 'ec2KeyPair' in data['computeResources'] and not data['computeResources']['ec2KeyPair']:
-                del data['computeResources']['ec2KeyPair']  # if there is an empty keypair name, don't provide it
+            compute_resources['instanceTypes'].append(self.machine.name)
+            if 'EC2KeyPair' in cf_output and cf_output['EC2KeyPair']:
+                compute_resources['ec2KeyPair'] = cf_output
+
+            data['serviceRole'] = cf_output['BatchServiceRole']
+            compute_resources['subnets'] = [cf_output['PrivateSubnet1'], cf_output['PrivateSubnet2']]
+            compute_resources['securityGroupIds'] = cf_output['BatchEC2SecurityGroup']
+            compute_resources['instanceRole'] = cf_output['ECSInstanceRole']
 
         data['tags'] = {'Name': compute_env_name}
         logging.info('Attempting to create AWS Batch Compute environment: %s', compute_env_name)
@@ -172,13 +178,14 @@ class AWSBatchScheduler(BaseBatchSchduler):
 
         return job_queue_name
 
-    def register_job_definition(self, compute_env_name, job_queue_name):
+    def register_job_definition(self, cf_output, compute_env_name, job_queue_name):
         with open('AWS/job-definition.json') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
             if self.image:
                 data['containerProperties']['image'] = self.image
+        data['jobRoleArn'] = cf_output['ECSTaskExecutionRole']
         job_definition_name = data.get('jobDefinitionName', self.job_def_name)
         data.setdefault('tags', {})
         data['tags'].update({'Name': job_definition_name, 'ComputeEnvironment': compute_env_name, 'JobQueue': job_queue_name})
@@ -186,11 +193,30 @@ class AWSBatchScheduler(BaseBatchSchduler):
         logging.info('Successfully registered AWS Batch Job Definition: %s', job_definition_name)
         return job_definition_name
 
+    def get_cf_stack_output(self):
+        logging.info('Attempting to query Cloudformation Stack: %s', self.cf_stack_name)
+        response = self.cf_client.describe_stacks(StackName=self.cf_stack_name)
+        stacks = response['Stacks']
+        if not stacks or 'Outputs' not in stacks[0] or not stacks[0]['Outputs']:
+            msg = f"Unable to query Cloudformation Stack {self.cf_stack_name}"
+            logging.exception(msg)
+            raise SchedulerException(msg)
+
+        output = stacks[0]['Outputs'][-1]
+        for key in ['PrivateSubnet1', 'PrivateSubnet2', 'BatchEC2SecurityGroup', 'ECSInstanceRole', 'ECSTaskExecutionRole', 'BatchServiceRole']:
+            if key not in output or not output[key]:
+                msg = f"Cloudformation stack {self.cf_stack_name} is missing required output: {key}"
+                logging.exception(msg)
+                raise SchedulerException(msg)
+
+        return output
+
     def submit_job(self, tries=1):
+        cf_output = self.get_cf_stack_output()
         self.create_or_update_launch_template()
-        compute_env_name = self.create_or_update_compute_environment()
+        compute_env_name = self.create_or_update_compute_environment(cf_output)
         job_queue_name = self.create_or_update_job_queue(compute_env_name)
-        job_definition_name = self.register_job_definition(compute_env_name, job_queue_name)
+        job_definition_name = self.register_job_definition(cf_output, compute_env_name, job_queue_name)
 
         jobname = os.path.basename(self.script)
         s3_path = 'script/' + jobname + '.sh'

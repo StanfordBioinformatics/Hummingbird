@@ -1,5 +1,5 @@
 {
-  "LaunchTemplateName": "hummingbird_disk_launch_template",
+  "LaunchTemplateName": "hummingbird_launch_template",
   "LaunchTemplateData": {
     "EbsOptimized": true,
     "BlockDeviceMappings": [

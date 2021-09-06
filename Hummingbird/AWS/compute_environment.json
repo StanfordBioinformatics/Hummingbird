@@ -1,5 +1,5 @@
 {
-  "computeEnvironmentName": "hummingbird-env",
+  "computeEnvironmentName": "",
   "type": "MANAGED",
   "state": "ENABLED",
   "computeResources": {
@@ -14,15 +14,14 @@
     ],
     "securityGroupIds": [
     ],
-    "ec2KeyPair": "",
-    "instanceRole": "ecsInstanceRole",
+    "instanceRole": "",
     "tags": {
       "KeyName": "hummingbird"
     },
     "launchTemplate": {
-      "launchTemplateName": "hummingbird_disk_launch_template",
+      "launchTemplateName": "hummingbird_launch_template",
       "version": "$Latest"
     }
   },
-  "serviceRole": "<AWSServiceRoleForBatch>"
+  "serviceRole": ""
 }
