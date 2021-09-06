@@ -59,7 +59,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.batch_client = boto3.client('batch', region_name=self.region)
         self.ec2_client = boto3.client('ec2', region_name=self.region)
         self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
-        self.cf_client = boto3.resource('cloudformation')
+        self.cf_client = boto3.resource('cloudformation', region_name=self.region)
         self.cf_stack_name = conf[PLATFORM]['cloudformation_stack_name']
         super(AWSBatchScheduler, self).__init__()
 
@@ -209,6 +209,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
                 logging.exception(msg)
                 raise SchedulerException(msg)
 
+        logging.info('Successfully queried Cloudformation Stack: %s', self.cf_stack_name)
         return output
 
     def submit_job(self, tries=1):
