@@ -59,7 +59,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.batch_client = boto3.client('batch', region_name=self.region)
         self.ec2_client = boto3.client('ec2', region_name=self.region)
         self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
-        self.cf_client = boto3.resource('cloudformation', region_name=self.region)
+        self.cf_client = boto3.client('cloudformation', region_name=self.region)
         self.cf_stack_name = conf[PLATFORM]['cloudformation_stack_name']
         super(AWSBatchScheduler, self).__init__()
 
@@ -97,10 +97,12 @@ class AWSBatchScheduler(BaseBatchSchduler):
             if 'EC2KeyPair' in cf_output and cf_output['EC2KeyPair']:
                 compute_resources['ec2KeyPair'] = cf_output
 
-            data['serviceRole'] = cf_output['BatchServiceRole']
+            data['serviceRole'] = cf_output['BatchServiceRoleARN']
             compute_resources['subnets'] = [cf_output['PrivateSubnet1'], cf_output['PrivateSubnet2']]
-            compute_resources['securityGroupIds'] = cf_output['BatchEC2SecurityGroup']
-            compute_resources['instanceRole'] = cf_output['ECSInstanceRole']
+            compute_resources['securityGroupIds'] = [cf_output['BatchEC2SecurityGroup']]
+            compute_resources['instanceRole'] = cf_output['ECSInstanceProfileRoleARN']
+
+            print(json.dumps(data))
 
         data['tags'] = {'Name': compute_env_name}
         logging.info('Attempting to create AWS Batch Compute environment: %s', compute_env_name)
@@ -183,9 +185,9 @@ class AWSBatchScheduler(BaseBatchSchduler):
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
+            data['containerProperties']['jobRoleArn'] = cf_output['ECSTaskExecutionRoleARN']
             if self.image:
                 data['containerProperties']['image'] = self.image
-        data['jobRoleArn'] = cf_output['ECSTaskExecutionRole']
         job_definition_name = data.get('jobDefinitionName', self.job_def_name)
         data.setdefault('tags', {})
         data['tags'].update({'Name': job_definition_name, 'ComputeEnvironment': compute_env_name, 'JobQueue': job_queue_name})
@@ -202,15 +204,19 @@ class AWSBatchScheduler(BaseBatchSchduler):
             logging.exception(msg)
             raise SchedulerException(msg)
 
-        output = stacks[0]['Outputs'][-1]
-        for key in ['PrivateSubnet1', 'PrivateSubnet2', 'BatchEC2SecurityGroup', 'ECSInstanceRole', 'ECSTaskExecutionRole', 'BatchServiceRole']:
-            if key not in output or not output[key]:
+        cf_output = {}
+        for key in ['PrivateSubnet1', 'PrivateSubnet2', 'BatchEC2SecurityGroup', 'ECSInstanceProfileRoleARN', 'ECSTaskExecutionRoleARN', 'BatchServiceRoleARN']:
+            for kv in stacks[0]['Outputs']:
+                if kv['OutputKey'] == key:
+                    cf_output[key] = kv['OutputValue']
+
+            if key not in cf_output:
                 msg = f"Cloudformation stack {self.cf_stack_name} is missing required output: {key}"
                 logging.exception(msg)
                 raise SchedulerException(msg)
 
         logging.info('Successfully queried Cloudformation Stack: %s', self.cf_stack_name)
-        return output
+        return cf_output
 
     def submit_job(self, tries=1):
         cf_output = self.get_cf_stack_output()

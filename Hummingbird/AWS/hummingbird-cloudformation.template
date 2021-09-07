@@ -219,6 +219,7 @@ Resources:
   ECSInstanceRole:
     Type: AWS::IAM::Role
     Properties:
+      Description: "Allows EC2 instances in an ECS cluster to access ECS."
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -233,10 +234,18 @@ Resources:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ECSInstanceRole
 
+  ECSInstanceProfileRole:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles:
+        - Ref: 'ECSInstanceRole'
+
   # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html
   ECSTaskExecutionRole:
     Type: AWS::IAM::Role
     Properties:
+      Description: "Allows ECS tasks to call AWS services on your behalf."
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -254,6 +263,7 @@ Resources:
   BatchServiceRole:
     Type: AWS::IAM::Role
     Properties:
+      Description: "Allows Batch to create and manage AWS resources on your behalf."
       AssumeRolePolicyDocument:
         Statement:
           - Effect: Allow
@@ -304,10 +314,30 @@ Outputs:
     Description: ECS Instance Role
     Value: !Ref ECSInstanceRole
 
+  ECSInstanceRoleARN:
+    Description: ECS Instance Role ARN
+    Value: !GetAtt ECSInstanceRole.Arn
+
+  ECSInstanceProfileRole:
+    Description: ECS Instance Profile Role
+    Value: !Ref ECSInstanceProfileRole
+
+  ECSInstanceProfileRoleARN:
+    Description: ECS Instance Profile Role ARN
+    Value: !GetAtt ECSInstanceProfileRole.Arn
+
   ECSTaskExecutionRole:
     Description: ECS Task Execution Role
     Value: !Ref ECSTaskExecutionRole
 
+  ECSTaskExecutionRoleARN:
+    Description: ECS Task Execution Role ARN
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+
   BatchServiceRole:
     Description: AWS Batch Service Role
     Value: !Ref BatchServiceRole
+
+  BatchServiceRoleARN:
+    Description: AWS Batch Service Role ARN
+    Value: !GetAtt BatchServiceRole.Arn
