@@ -9,8 +9,16 @@ from Hummingbird.scheduler import AWSBatchScheduler
 
 
 class TestAWSScheduler(unittest.TestCase):
-    conf = {PLATFORM: {'regions': 'us-west-2', 'bucket': 'local-bucket'}}
+    conf = {PLATFORM: {'regions': 'us-west-2', 'bucket': 'local-bucket', 'cloudformation_stack_name': 'test'}}
     jobs = ['some-job-id']
+    cf_stack_output = [
+        {'OutputKey': 'PrivateSubnet1', 'OutputValue': 'subnet1'},
+        {'OutputKey': 'PrivateSubnet2', 'OutputValue': 'subnet2'},
+        {'OutputKey': 'BatchEC2SecurityGroup', 'OutputValue': 'sg-test'},
+        {'OutputKey': 'ECSInstanceProfileRoleARN', 'OutputValue': 'ecsInstanceRole'},
+        {'OutputKey': 'ECSTaskExecutionRoleARN', 'OutputValue': 'taskExecutionRole'},
+        {'OutputKey': 'BatchServiceRoleARN', 'OutputValue': 'awsBatchServiceRole'}
+    ]
     launch_template = """
 {
   "LaunchTemplateName": "hummingbird_launch_template",
@@ -100,3 +108,23 @@ class TestAWSScheduler(unittest.TestCase):
         self.instance.create_or_update_launch_template()
 
         client_mock.create_launch_template_version.assert_called_once()
+
+    @patch('boto3.client', return_value=MagicMock())
+    def test_get_cf_stack_output(self, client_mock):
+        self.instance.cf_client = client_mock
+        client_mock.describe_stacks.return_value = {'Stacks': [{'StackName': 'test', 'Outputs': self.cf_stack_output}]}
+
+        self.instance.get_cf_stack_output()
+
+        client_mock.describe_stacks.assert_called_once_with(StackName='test')
+
+    @patch('boto3.client', return_value=MagicMock())
+    @patch('logging.exception')
+    def test_get_cf_stack_output_missing_key(self, _, client_mock):
+        self.instance.cf_client = client_mock
+
+        for kv in self.cf_stack_output:
+            output = [item for item in self.cf_stack_output if item != kv]
+            client_mock.describe_stacks.return_value = {'Stacks': [{'StackName': 'test', 'Outputs': output}]}
+
+            self.assertRaises(SchedulerException, self.instance.get_cf_stack_output)

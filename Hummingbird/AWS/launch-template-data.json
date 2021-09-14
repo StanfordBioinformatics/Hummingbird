@@ -1,16 +1,33 @@
 {
-  "LaunchTemplateName": "hummingbird_disk_launch_template",
+  "LaunchTemplateName": "hummingbird",
   "LaunchTemplateData": {
     "EbsOptimized": true,
     "BlockDeviceMappings": [
       {
+        "DeviceName": "/dev/xvda",
+        "Ebs": {
+          "DeleteOnTermination": true,
+          "VolumeType": "gp3",
+          "VolumeSize": 50
+        }
+      },
+      {
+        "DeviceName": "/dev/xvdcz",
+        "Ebs": {
+          "DeleteOnTermination": true,
+          "VolumeType": "gp3",
+          "VolumeSize": 22,
+          "Encrypted": true
+        }
+      },
+      {
+        "DeviceName": "/dev/xvdba",
         "Ebs": {
           "DeleteOnTermination": true,
           "VolumeType": "gp3",
           "VolumeSize": 100,
           "Encrypted": true
-        },
-        "DeviceName": "/dev/xvda"
+        }
       }
     ]
   }

@@ -3,7 +3,8 @@
     "service": "aws",
     "project": "<insert project id>",
     "regions": "us-west-2",
-    "bucket": "<insert root bucket without s3://>"
+    "bucket": "<insert root bucket without s3://>",
+    "cloudformation_stack_name": "hummingbird"
   },
   "Downsample": {
     "input": {

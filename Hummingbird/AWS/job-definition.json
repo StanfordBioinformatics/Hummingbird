@@ -10,7 +10,7 @@
       "-c",
       "/usr/local/bin/aws_fetch_and_run.sh"
     ],
-    "jobRoleArn": "<ecsTaskExecutionRole>",
+    "jobRoleArn": "",
     "volumes": [
     ],
     "environment": [
@@ -18,8 +18,6 @@
     "mountPoints": [
     ],
     "ulimits": [
-    ],
-    "resourceRequirements": [
     ]
   },
   "retryStrategy": {
