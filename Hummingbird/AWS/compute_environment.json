@@ -19,7 +19,7 @@
       "KeyName": "hummingbird"
     },
     "launchTemplate": {
-      "launchTemplateName": "hummingbird_launch_template",
+      "launchTemplateName": "hummingbird",
       "version": "$Latest"
     }
   },

@@ -206,10 +206,9 @@ Resources:
       GroupDescription: "AWS Batch EC2 Security Group"
       GroupName: !Sub ${EnvironmentName}-sg
       SecurityGroupEgress:
-        - IpProtocol: tcp
-          FromPort: 0
-          ToPort: 0
+        - IpProtocol: "-1"
           CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-SG
@@ -224,12 +223,14 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [ ec2.amazonaws.com ]
-            Action: [ 'sts:AssumeRole' ]
-      Path: /
+              Service:
+                - 'ec2.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role'
-        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess' # TODO narrow down to S3 bucket Read/Write
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2RoleForSSM'
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ECSInstanceRole
@@ -237,9 +238,9 @@ Resources:
   ECSInstanceProfileRole:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      Path: /
+      InstanceProfileName: !Ref ECSInstanceRole
       Roles:
-        - Ref: 'ECSInstanceRole'
+        - !Ref ECSInstanceRole
 
   # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html
   ECSTaskExecutionRole:
@@ -250,11 +251,13 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [ ecs-tasks.amazonaws.com ]
-            Action: [ 'sts:AssumeRole' ]
-      Path: /
+              Service:
+                - 'ecs-tasks.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+        - 'arn:aws:iam::aws:policy/AmazonS3FullAccess'
       Tags:
         - Key: Name
           Value: !Sub ${EnvironmentName}-ECSTaskExecutionRole
@@ -268,9 +271,10 @@ Resources:
         Statement:
           - Effect: Allow
             Principal:
-              Service: [ batch.amazonaws.com ]
-            Action: [ 'sts:AssumeRole' ]
-      Path: /
+              Service:
+                - 'batch.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
       ManagedPolicyArns:
         - 'arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole'
       Tags:

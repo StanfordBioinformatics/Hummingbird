@@ -66,7 +66,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
     def create_or_update_launch_template(self):
         with open('AWS/launch-template-data.json') as f:
             data = json.load(f)
-            data['LaunchTemplateData']['BlockDeviceMappings'][0]['Ebs']['VolumeSize'] = int(self.disk_size)
+            data['LaunchTemplateData']['BlockDeviceMappings'][-1]['Ebs']['VolumeSize'] = int(self.disk_size)
 
         from botocore.exceptions import ClientError
         try:
@@ -101,8 +101,6 @@ class AWSBatchScheduler(BaseBatchSchduler):
             compute_resources['subnets'] = [cf_output['PrivateSubnet1'], cf_output['PrivateSubnet2']]
             compute_resources['securityGroupIds'] = [cf_output['BatchEC2SecurityGroup']]
             compute_resources['instanceRole'] = cf_output['ECSInstanceProfileRoleARN']
-
-            print(json.dumps(data))
 
         data['tags'] = {'Name': compute_env_name}
         logging.info('Attempting to create AWS Batch Compute environment: %s', compute_env_name)
