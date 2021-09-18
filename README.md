@@ -1,4 +1,4 @@
-<img src="https://github.com/StanfordBioinformatics/Hummingbird/blob/master/docs/hummingbird_2_2x.png" width="200" align="right">
+<img src="https://github.com/StanfordBioinformatics/Hummingbird/blob/main/docs/hummingbird_2_2x.png" width="200" align="right">
 
 # Hummingbird: Efficient Performance Prediction for Executing Genomic Applications in the Cloud #
 
