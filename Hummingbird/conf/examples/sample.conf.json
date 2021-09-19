@@ -1,6 +1,6 @@
 {
   "Platform": {
-    "service": "gcp/aws",
+    "service": "gcp",
     "project": "<your-project-id>",
     "regions": "<region>",
     "bucket": "<your-bucket-name>"
