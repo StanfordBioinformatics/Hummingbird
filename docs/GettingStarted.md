@@ -14,6 +14,7 @@ gcloud auth application-default login
 ### Getting started on AWS Batch
 
 1. Create the Hummingbird Cloudformation Stack in the target AWS Account and Region.
+   This will create the necessary networking components (i.e. VPC, Subnets, Security Groups) to run Hummingbird.
 
    [![Launch Stack](https://cdn.rawgit.com/buildkite/cloudformation-launch-stack-button-svg/master/launch-stack.svg)](
    https://console.aws.amazon.com/cloudformation/home?#/stacks/new?stackName=hummingbird&templateURL=https://cf-templates-gvgta4w56y1c-us-west-2.s3.us-west-2.amazonaws.com/hummingbird-cloudformation.template)
