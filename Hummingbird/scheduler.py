@@ -12,7 +12,7 @@ from typing import List
 from retry import retry
 
 from .errors import SchedulerException
-from .hummingbird_utils import PLATFORM
+from .hummingbird_utils import PLATFORM, get_full_path
 
 
 class Scheduler(object):
@@ -64,7 +64,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
         super(AWSBatchScheduler, self).__init__()
 
     def create_or_update_launch_template(self):
-        with open('AWS/launch-template-data.json') as f:
+        path = get_full_path('AWS/launch-template-data.json')
+        with open(path, 'r') as f:
             data = json.load(f)
             data['LaunchTemplateData']['BlockDeviceMappings'][-1]['Ebs']['VolumeSize'] = int(self.disk_size)
 
@@ -82,7 +83,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
             self.ec2_client.create_launch_template_version(**data)
 
     def create_or_update_compute_environment(self, cf_output):
-        with open('AWS/compute_environment.json') as f:
+        path = get_full_path('AWS/compute_environment.json')
+        with open(path, 'r') as f:
             data = json.load(f)
 
             compute_env_name = self.cf_stack_name + '-' + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
@@ -179,7 +181,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
         return job_queue_name
 
     def register_job_definition(self, cf_output, compute_env_name, job_queue_name):
-        with open('AWS/job-definition.json') as f:
+        path = get_full_path('AWS/job-definition.json')
+        with open(path, 'r') as f:
             data = json.load(f)
             data['containerProperties']['vcpus'] = self.machine.cpu
             data['containerProperties']['memory'] = int(self.machine.mem) * 1024
@@ -359,7 +362,7 @@ class AzureBatchScheduler(BaseBatchSchduler):
 
     @staticmethod
     def _get_task_definition():
-        path = os.path.join(os.path.dirname(__file__), 'Azure/task.json')
+        path = get_full_path('Azure/task.json')
         with open(path, 'r') as task:
             return json.load(task)[0]
 
