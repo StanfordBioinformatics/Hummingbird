@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from botocore.exceptions import WaiterError, ClientError
@@ -6,6 +7,7 @@ from mock import patch, MagicMock, mock_open
 from Hummingbird.errors import SchedulerException
 from Hummingbird.hummingbird_utils import PLATFORM
 from Hummingbird.scheduler import AWSBatchScheduler
+from Hummingbird.hummingbird_utils import get_full_path
 
 
 class TestAWSScheduler(unittest.TestCase):
@@ -19,25 +21,6 @@ class TestAWSScheduler(unittest.TestCase):
         {'OutputKey': 'ECSTaskExecutionRoleARN', 'OutputValue': 'taskExecutionRole'},
         {'OutputKey': 'BatchServiceRoleARN', 'OutputValue': 'awsBatchServiceRole'}
     ]
-    launch_template = """
-{
-  "LaunchTemplateName": "hummingbird_launch_template",
-  "LaunchTemplateData": {
-    "EbsOptimized": true,
-    "BlockDeviceMappings": [
-      {
-        "Ebs": {
-          "DeleteOnTermination": true,
-          "VolumeType": "gp3",
-          "VolumeSize": 100,
-          "Encrypted": true
-        },
-        "DeviceName": "/dev/xvda"
-      }
-    ]
-  }
-}
-    """
 
     def setUp(self):
         self.instance = AWSBatchScheduler(self.conf, None, 100, None)
@@ -90,8 +73,7 @@ class TestAWSScheduler(unittest.TestCase):
         self.assertEqual(60, compute_env_waiter.config.delay)
 
     @patch('boto3.client', return_value=MagicMock())
-    @patch('builtins.open', new_callable=mock_open, read_data=launch_template)
-    def test_create_or_update_launch_template_create(self, _, client_mock):
+    def test_create_or_update_launch_template_create(self, client_mock):
         self.instance.ec2_client = client_mock
         client_mock.describe_launch_templates.side_effect = ClientError({}, 'DescribeLaunchTemplate')
 
@@ -100,14 +82,22 @@ class TestAWSScheduler(unittest.TestCase):
         client_mock.create_launch_template.assert_called_once()
 
     @patch('boto3.client', return_value=MagicMock())
-    @patch('builtins.open', new_callable=mock_open, read_data=launch_template)
-    def test_create_or_update_launch_template_create_version(self, _, client_mock):
+    def test_create_or_update_launch_template_create_version(self, client_mock):
         self.instance.ec2_client = client_mock
-        client_mock.describe_launch_templates.return_value = {'LaunchTemplates': [self.launch_template]}
 
         self.instance.create_or_update_launch_template()
 
         client_mock.create_launch_template_version.assert_called_once()
+
+    @patch('boto3.client', return_value=MagicMock())
+    def test_create_or_update_launch_template_uses_template(self, client_mock):
+        self.instance.ec2_client = client_mock
+
+        self.instance.create_or_update_launch_template()
+
+        with open(get_full_path('AWS/launch-template-data.json')) as tpl:
+            data = json.load(tpl)
+            client_mock.create_launch_template_version.assert_called_once_with(**data)
 
     @patch('boto3.client', return_value=MagicMock())
     def test_get_cf_stack_output(self, client_mock):

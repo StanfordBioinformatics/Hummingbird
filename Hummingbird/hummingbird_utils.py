@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 
 import matplotlib
@@ -87,6 +88,10 @@ def spline(method, known_data, target_value):
         plt.plot(x_test, f(x_test), 'b', x, y, 'ro')
     plt.show()
     return result
+
+
+def get_full_path(*paths):
+    return os.path.join(os.path.dirname(__file__), *paths)
 
 
 def regression(known_data, target_value, filename='plot/hummingbird.png'):
