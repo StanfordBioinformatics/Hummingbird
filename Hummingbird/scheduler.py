@@ -68,6 +68,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         with open(path, 'r') as f:
             data = json.load(f)
             data['LaunchTemplateData']['BlockDeviceMappings'][-1]['Ebs']['VolumeSize'] = int(self.disk_size)
+            data['LaunchTemplateName'] = self.get_compute_name()
 
         from botocore.exceptions import ClientError
         try:
@@ -87,7 +88,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         with open(path, 'r') as f:
             data = json.load(f)
 
-            compute_env_name = self.cf_stack_name + '-' + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
+            compute_env_name = self.get_compute_name()
             desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
             if desc_json['computeEnvironments']:
                 logging.info('Skipping creation of AWS Batch Compute environment %s as it already exists', compute_env_name)
@@ -96,6 +97,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
             compute_resources = data['computeResources']
             data['computeEnvironmentName'] = compute_env_name
             compute_resources['instanceTypes'].append(self.machine.name)
+            compute_resources['launchTemplate'] = {'launchTemplateName': self.get_compute_name()}
             if 'EC2KeyPair' in cf_output and cf_output['EC2KeyPair']:
                 compute_resources['ec2KeyPair'] = cf_output
 
@@ -332,6 +334,8 @@ class AWSBatchScheduler(BaseBatchSchduler):
         from botocore import waiter
         return waiter.create_waiter_with_client(waiter_id, model, self.batch_client)
 
+    def get_compute_name(self):
+        return self.cf_stack_name + '-' + self.machine.name.replace('.', '_') + '-' + str(self.disk_size)
 
 class AzureBatchScheduler(BaseBatchSchduler):
     def __init__(self, conf, machine, disk_size, script, **kwargs):

@@ -7,6 +7,7 @@ from mock import patch, MagicMock, mock_open
 from Hummingbird.errors import SchedulerException
 from Hummingbird.hummingbird_utils import PLATFORM
 from Hummingbird.scheduler import AWSBatchScheduler
+from Hummingbird.instance import AWSInstance
 from Hummingbird.hummingbird_utils import get_full_path
 
 
@@ -23,7 +24,7 @@ class TestAWSScheduler(unittest.TestCase):
     ]
 
     def setUp(self):
-        self.instance = AWSBatchScheduler(self.conf, None, 100, None)
+        self.instance = AWSBatchScheduler(self.conf, AWSInstance(), 100, None)
 
     def test_instance_fields(self):
         instance = AWSBatchScheduler(self.conf, None, None, None)
@@ -97,6 +98,7 @@ class TestAWSScheduler(unittest.TestCase):
 
         with open(get_full_path('AWS/launch-template-data.json')) as tpl:
             data = json.load(tpl)
+            data['LaunchTemplateName'] = self.instance.get_compute_name()
             client_mock.create_launch_template_version.assert_called_once_with(**data)
 
     @patch('boto3.client', return_value=MagicMock())
