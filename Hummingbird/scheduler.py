@@ -13,6 +13,7 @@ from retry import retry
 
 from .errors import SchedulerException
 from .hummingbird_utils import PLATFORM, get_full_path
+import time
 
 
 class Scheduler(object):
@@ -59,6 +60,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
         self.batch_client = boto3.client('batch', region_name=self.region)
         self.ec2_client = boto3.client('ec2', region_name=self.region)
         self.s3_bucket = boto3.resource('s3').Bucket(self.conf[PLATFORM]['bucket'])
+        self.s3_client = boto3.client('s3', region_name=self.region)
         self.cf_client = boto3.client('cloudformation', region_name=self.region)
         self.cf_stack_name = conf[PLATFORM]['cloudformation_stack_name']
         super(AWSBatchScheduler, self).__init__()
@@ -131,7 +133,7 @@ class AWSBatchScheduler(BaseBatchSchduler):
                 waiter_id: {
                     'delay': 1,
                     'operation': 'DescribeComputeEnvironments',
-                    'maxAttempts': 20,
+                    'maxAttempts': 100,
                     'acceptors': [
                         {
                             'expected': 'VALID',
@@ -221,14 +223,85 @@ class AWSBatchScheduler(BaseBatchSchduler):
         logging.info('Successfully queried Cloudformation Stack: %s', self.cf_stack_name)
         return cf_output
 
+    def is_job_queue_deleted(self, queue_name):
+        desc_json = self.batch_client.describe_job_queues(jobQueues=[queue_name])
+        if desc_json['jobQueues']:  # Delete if exist 
+            return False
+        else:
+            return True    
+
+    def is_compute_env_deleted(self, compute_env_name):
+        desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[compute_env_name])
+        if desc_json['computeEnvironments']:   
+            return False
+        else:
+            return True                  
+
+    def delete_job_queue(self, queue_name):
+        desc_json = self.batch_client.describe_job_queues(jobQueues=[queue_name])
+        if desc_json['jobQueues']:  # Delete if exist     
+            logging.info('Deleting Job Queue %s', queue_name)
+            self.batch_client.update_job_queue(state='DISABLED', jobQueue=queue_name) 
+            job_queue_waiter=self.get_compute_job_queue_waiter(queue_name)
+            job_queue_waiter.wait(jobQueues=[queue_name])        
+            self.batch_client.delete_job_queue(jobQueue=queue_name)  
+            while not self.is_job_queue_deleted(queue_name):
+                time.sleep(10)
+
+    def cleanup(self):
+        logging.info('Cleaning up AWS resources')
+        result = self.s3_client.list_objects_v2(
+            Prefix="resources",
+            Bucket=self.conf[PLATFORM]['bucket']
+            )        
+        for o in result.get('Contents'):
+            obj=self.s3_client.get_object(
+                        Key=o['Key'],
+                        Bucket=self.conf[PLATFORM]['bucket']
+                        )     
+            resources=json.loads(obj['Body'].read())
+            queue_name=resources['job_queue_name']
+            self.delete_job_queue(queue_name=resources['job_queue_name'])
+
+            desc_json = self.batch_client.describe_compute_environments(computeEnvironments=[resources['compute_env_name']])
+            if desc_json['computeEnvironments']:   
+                logging.info('Deleting Compute environment %s', resources['compute_env_name'])
+                self.batch_client.update_compute_environment(
+                    computeEnvironment=resources['compute_env_name'],
+                    state='DISABLED'
+                )            
+                import botocore.waiter
+                try:
+                    waiter = self.get_compute_environment_waiter(resources['compute_env_name'])
+                    waiter.wait(computeEnvironments=[resources['compute_env_name']])
+                except botocore.waiter.WaiterError as e:
+                    msg = f"There was an error with the AWS Batch Compute Environment: {resources['compute_env_name']}"
+                    logging.exception(msg)
+                    raise SchedulerException(msg)
+
+                self.batch_client.delete_compute_environment(computeEnvironment=resources['compute_env_name'])    
+                while not self.is_compute_env_deleted(resources['compute_env_name']):
+                    time.sleep(10)                
+                
+
     def submit_job(self, tries=1):
+        #self.cleanup()
         cf_output = self.get_cf_stack_output()
         self.create_or_update_launch_template()
         compute_env_name = self.create_or_update_compute_environment(cf_output)
         job_queue_name = self.create_or_update_job_queue(compute_env_name)
         job_definition_name = self.register_job_definition(cf_output, compute_env_name, job_queue_name)
-
+        job_resources={
+            "compute_env_name": compute_env_name,
+            "job_queue_name":job_queue_name,
+            "job_definition_name": job_definition_name
+        }
         jobname = os.path.basename(self.script)
+        self.s3_bucket.put_object(
+            Body=(bytes(json.dumps(job_resources).encode('UTF-8'))),
+            Key="resources/" + jobname + '.json'
+            )
+
         s3_path = 'script/' + jobname + '.sh'
         self.s3_bucket.upload_file(self.script, s3_path)
         data = dict()

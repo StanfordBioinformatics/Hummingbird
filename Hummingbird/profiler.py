@@ -67,6 +67,13 @@ class Profiler(object):
         else:
             self.profiler = BashProfiler(self.mode, conf)
 
+    def cleanup(self):
+        """Perform cleanup for resources
+        """
+        if self.service == 'aws':
+            scheduler = AWSBatchScheduler(self.conf, machine='', disk_size='', script='', image='')
+            scheduler.cleanup()                      
+
     def profile(self, input_dict, machines=None):
         """Perform profiling on given input and collect result from cloud
             storage bucket.
