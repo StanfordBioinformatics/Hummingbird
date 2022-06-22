@@ -28,7 +28,7 @@ setup(
             'future==0.18.2',
             'configparser==5.0.0',
             'scipy==1.5.2',
-            'numpy==1.19.1',
+            'numpy==1.22.0',
             'matplotlib==3.3.0',
             'scikit-learn==0.23.2',
             'google-cloud-storage==1.30.0',
