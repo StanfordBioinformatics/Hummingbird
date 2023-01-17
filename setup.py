@@ -25,7 +25,7 @@ setup(
         python_requires='>=3.8, <4',
         install_requires=[
             'dsub==0.3.6',
-            'future==0.18.2',
+            'future==0.18.3',
             'configparser==5.0.0',
             'scipy==1.8.1',
             'numpy==1.23.0',
