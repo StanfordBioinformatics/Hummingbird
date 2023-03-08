@@ -48,6 +48,7 @@ def main():
     logging.info('Downsampling done.')
 
     target = config[DOWNSAMPLE]['target']
+    profiler=''
     for i, workflow in enumerate(config[PROFILING]):
         # user_input = input('Do you want to continue? [y/N]: ')
         # if user_input != 'y' and user_input != 'Y':
@@ -153,7 +154,8 @@ def main():
                 logging.warning(
                     f"Unable to run profiling for downsample size of {ds_size} as it is not present in the downsample configuration.")
                 break
-
+    profiler.cleanup()
+    
 
 if __name__ == "__main__":
     main()
