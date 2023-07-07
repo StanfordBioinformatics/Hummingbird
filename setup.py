@@ -27,7 +27,7 @@ setup(
             'dsub==0.3.6',
             'future==0.18.3',
             'configparser==5.0.0',
-            'scipy==1.8.1',
+            'scipy==1.10.0',
             'numpy==1.23.0',
             'matplotlib==3.5.2',
             'scikit-learn==1.1.1',
