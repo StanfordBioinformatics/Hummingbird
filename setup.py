@@ -34,7 +34,7 @@ setup(
             'google-cloud-storage==1.30.0',
             'boto3==1.18.6',
             'azure-storage-blob==12.13.0',
-            'azure-identity==1.5.0',
+            'azure-identity==1.16.1',
             'azure-batch==10.0.0',
             'azure-mgmt-compute==18.0.0',
             'retry==0.9.2',
