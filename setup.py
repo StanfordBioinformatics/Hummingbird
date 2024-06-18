@@ -30,7 +30,7 @@ setup(
             'scipy==1.10.0',
             'numpy==1.23.0',
             'matplotlib==3.5.2',
-            'scikit-learn==1.1.1',
+            'scikit-learn==1.5.0',
             'google-cloud-storage==1.30.0',
             'boto3==1.18.6',
             'azure-storage-blob==12.13.0',
